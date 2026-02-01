@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tab Sorter</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header class="toolbar">
+      <div class="title">Tab Sorter Cleaner</div>
+      <div class="actions">
+        <button id="closeDuplicates">Close duplicates</button>
+        <button id="sortAlpha">Sort A-Z</button>
+        <button id="sortLastVisited">Sort by last visited</button>
+        <button id="groupDomain">Group by domain</button>
+      </div>
+    </header>
+
+    <main class="content">
+      <section class="list">
+        <div class="list-header">
+          <span>Tabs in this window</span>
+          <span id="tabCount">0</span>
+        </div>
+        <ul id="tabs"></ul>
+      </section>
+      <aside class="details">
+        <div class="details-title">Tab details</div>
+        <div id="detailsBody" class="details-body">
+          Hover a tab to see last visited and time spent.
+        </div>
+      </aside>
+    </main>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

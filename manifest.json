@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Tab Sorter Cleaner",
+  "version": "0.1.0",
+  "description": "Sort tabs, close duplicates, and inspect recent activity.",
+  "permissions": ["tabs", "history", "storage"],
+  "action": {
+    "default_title": "Tab Sorter",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "service_worker.js"
+  }
+}
