@@ -8,6 +8,7 @@ const sortLastVisitedButton = document.getElementById("sortLastVisited");
 const groupDomainButton = document.getElementById("groupDomain");
 const collapseGroupsButton = document.getElementById("collapseGroups");
 const expandGroupsButton = document.getElementById("expandGroups");
+const ungroupAllButton = document.getElementById("ungroupAll");
 
 const nameGroupsToggle = document.getElementById("nameGroups");
 const groupColorSelect = document.getElementById("groupColor");
@@ -52,6 +53,25 @@ async function fetchLastVisited(url) {
   return last.visitTime;
 }
 
+async function fetchLastVisitedBatch(urls) {
+  const unique = Array.from(new Set(urls.filter(Boolean)));
+  const results = new Map();
+  const entries = await Promise.all(
+    unique.map(async (url) => {
+      const visits = await chrome.history.getVisits({ url });
+      if (!visits || visits.length === 0) return [url, null];
+      const last = visits.reduce((latest, visit) => {
+        return visit.visitTime > latest.visitTime ? visit : latest;
+      }, visits[0]);
+      return [url, last.visitTime];
+    })
+  );
+  for (const [url, lastVisited] of entries) {
+    results.set(url, lastVisited);
+  }
+  return results;
+}
+
 async function fetchTabsWithMeta() {
   const [tabs, timeData] = await Promise.all([
     chrome.tabs.query({ currentWindow: true }),
@@ -59,17 +79,15 @@ async function fetchTabsWithMeta() {
   ]);
 
   const timeByTabId = timeData?.timeByTabId || {};
-  const withMeta = await Promise.all(
-    tabs.map(async (tab) => {
-      const lastVisited = await fetchLastVisited(tab.url);
-      return {
-        tab,
-        lastVisited,
-        timeSpent: timeByTabId[tab.id] || 0,
-        hostname: getHostname(tab.url)
-      };
-    })
+  const lastVisitedByUrl = await fetchLastVisitedBatch(
+    tabs.map((tab) => tab.url)
   );
+  const withMeta = tabs.map((tab) => ({
+    tab,
+    lastVisited: lastVisitedByUrl.get(tab.url) || null,
+    timeSpent: timeByTabId[tab.id] || 0,
+    hostname: getHostname(tab.url)
+  }));
 
   return withMeta;
 }
@@ -140,66 +158,91 @@ async function moveTabsInOrder(sorted) {
   }
 }
 
-async function moveTabsByIdOrder(tabIds) {
-  for (let index = 0; index < tabIds.length; index += 1) {
-    await chrome.tabs.move(tabIds[index], { index });
-  }
-}
-
-function buildSortedOrderWithGroupBlocks(tabs, metaById, comparator) {
-  const topLevel = tabs.filter((tab) => tab.groupId === -1);
+async function sortWithGroups(comparator, metaById) {
+  const tabs = await chrome.tabs.query({ currentWindow: true });
   const groupMap = new Map();
+  const topLevel = [];
+
   for (const tab of tabs) {
-    if (tab.groupId === -1) continue;
+    if (tab.groupId === -1) {
+      topLevel.push(tab);
+      continue;
+    }
     const list = groupMap.get(tab.groupId) || [];
     list.push(tab);
     groupMap.set(tab.groupId, list);
   }
 
-  const sortedGroups = new Map();
-  const groupRepresentatives = new Map();
-  for (const [groupId, list] of groupMap.entries()) {
-    const sorted = [...list].sort((a, b) =>
-      comparator(metaById[a.id], metaById[b.id])
+  const groupEntries = Array.from(groupMap.entries()).map(([groupId, list]) => {
+    const sortedTabs = [...list].sort((a, b) =>
+      comparator(metaById.get(a.id), metaById.get(b.id))
     );
-    sortedGroups.set(groupId, sorted);
-    if (sorted.length > 0) {
-      groupRepresentatives.set(groupId, metaById[sorted[0].id]);
+    return { groupId, sortedTabs };
+  });
+
+  groupEntries.sort((a, b) => {
+    const indexA = Math.min(...a.sortedTabs.map((tab) => tab.index));
+    const indexB = Math.min(...b.sortedTabs.map((tab) => tab.index));
+    return indexA - indexB;
+  });
+
+  for (const entry of groupEntries) {
+    const startIndex = Math.min(...entry.sortedTabs.map((tab) => tab.index));
+    for (let offset = 0; offset < entry.sortedTabs.length; offset += 1) {
+      const tab = entry.sortedTabs[offset];
+      await chrome.tabs.move(tab.id, { index: startIndex + offset });
     }
   }
 
+  const refreshed = await chrome.tabs.query({ currentWindow: true });
+  const refreshedGroupMap = new Map();
+  const refreshedTopLevel = [];
+
+  for (const tab of refreshed) {
+    if (tab.groupId === -1) {
+      refreshedTopLevel.push(tab);
+      continue;
+    }
+    const list = refreshedGroupMap.get(tab.groupId) || [];
+    list.push(tab);
+    refreshedGroupMap.set(tab.groupId, list);
+  }
+
   const blocks = [];
-  for (const tab of topLevel) {
+  for (const tab of refreshedTopLevel) {
     blocks.push({ type: "tab", id: tab.id });
   }
-  for (const groupId of sortedGroups.keys()) {
-    blocks.push({ type: "group", id: groupId });
+  for (const [groupId, list] of refreshedGroupMap.entries()) {
+    const sortedTabs = [...list].sort((a, b) =>
+      comparator(metaById.get(a.id), metaById.get(b.id))
+    );
+    blocks.push({
+      type: "group",
+      id: groupId,
+      size: sortedTabs.length,
+      representative: metaById.get(sortedTabs[0]?.id) || null
+    });
   }
 
   blocks.sort((a, b) => {
-    const metaA =
-      a.type === "tab" ? metaById[a.id] : groupRepresentatives.get(a.id);
-    const metaB =
-      b.type === "tab" ? metaById[b.id] : groupRepresentatives.get(b.id);
+    const metaA = a.type === "tab" ? metaById.get(a.id) : a.representative;
+    const metaB = b.type === "tab" ? metaById.get(b.id) : b.representative;
     if (!metaA && !metaB) return 0;
     if (!metaA) return 1;
     if (!metaB) return -1;
     return comparator(metaA, metaB);
   });
 
-  const desired = [];
+  let targetIndex = 0;
   for (const block of blocks) {
     if (block.type === "tab") {
-      desired.push(block.id);
+      await chrome.tabs.move(block.id, { index: targetIndex });
+      targetIndex += 1;
       continue;
     }
-    const groupTabs = sortedGroups.get(block.id) || [];
-    for (const groupTab of groupTabs) {
-      desired.push(groupTab.id);
-    }
+    await chrome.tabGroups.move(block.id, { index: targetIndex });
+    targetIndex += block.size || 0;
   }
-
-  return desired;
 }
 
 async function sortAlphabetically() {
@@ -218,8 +261,7 @@ async function sortAlphabetically() {
   });
 
   if (tabs.some((tab) => tab.groupId !== -1)) {
-    const desired = buildSortedOrderWithGroupBlocks(tabs, metaById, comparator);
-    await moveTabsByIdOrder(desired);
+    await sortWithGroups(comparator, metaById);
   } else {
     await moveTabsInOrder(sorted);
   }
@@ -242,8 +284,7 @@ async function sortByLastVisited() {
   });
 
   if (tabs.some((tab) => tab.groupId !== -1)) {
-    const desired = buildSortedOrderWithGroupBlocks(tabs, metaById, comparator);
-    await moveTabsByIdOrder(desired);
+    await sortWithGroups(comparator, metaById);
   } else {
     await moveTabsInOrder(sorted);
   }
@@ -322,6 +363,14 @@ async function setAllGroupsCollapsed(collapsed) {
   await refresh();
 }
 
+async function ungroupAllTabs() {
+  const tabs = await chrome.tabs.query({ currentWindow: true });
+  const groupedTabs = tabs.filter((tab) => tab.groupId !== -1);
+  if (groupedTabs.length === 0) return;
+  await chrome.tabs.ungroup(groupedTabs.map((tab) => tab.id));
+  await refresh();
+}
+
 async function refresh() {
   const tabsWithMeta = await fetchTabsWithMeta();
   renderTabs(tabsWithMeta);
@@ -333,5 +382,6 @@ sortLastVisitedButton.addEventListener("click", sortByLastVisited);
 groupDomainButton.addEventListener("click", groupByDomain);
 collapseGroupsButton.addEventListener("click", () => setAllGroupsCollapsed(true));
 expandGroupsButton.addEventListener("click", () => setAllGroupsCollapsed(false));
+ungroupAllButton.addEventListener("click", ungroupAllTabs);
 
 refresh();
