@@ -2,6 +2,14 @@ const tabsList = document.getElementById("tabs");
 const tabCount = document.getElementById("tabCount");
 const detailsBody = document.getElementById("detailsBody");
 
+const SETTINGS_KEY = "tabSorterSettings";
+const settings = {
+  nameGroups: true,
+  groupColor: "blue",
+  collapseAfterGroup: false,
+  lastVisitedOrder: "desc"
+};
+
 const closeDuplicatesButton = document.getElementById("closeDuplicates");
 const sortAlphaButton = document.getElementById("sortAlpha");
 const sortLastVisitedButton = document.getElementById("sortLastVisited");
@@ -50,6 +58,25 @@ function abbreviateDomain(hostname) {
 
 function getTabTimes() {
   return chrome.runtime.sendMessage({ type: "getTabTimes" });
+}
+
+async function loadSettings() {
+  const data = await chrome.storage.local.get([SETTINGS_KEY]);
+  if (data[SETTINGS_KEY]) {
+    Object.assign(settings, data[SETTINGS_KEY]);
+  }
+  if (nameGroupsToggle) nameGroupsToggle.checked = settings.nameGroups;
+  if (groupColorSelect) groupColorSelect.value = settings.groupColor || "";
+  if (collapseAfterGroupToggle) {
+    collapseAfterGroupToggle.checked = settings.collapseAfterGroup;
+  }
+  if (lastVisitedOrderSelect) {
+    lastVisitedOrderSelect.value = settings.lastVisitedOrder || "desc";
+  }
+}
+
+function saveSettings() {
+  return chrome.storage.local.set({ [SETTINGS_KEY]: settings });
 }
 
 async function fetchLastVisited(url) {
@@ -392,4 +419,29 @@ collapseGroupsButton.addEventListener("click", () => setAllGroupsCollapsed(true)
 expandGroupsButton.addEventListener("click", () => setAllGroupsCollapsed(false));
 ungroupAllButton.addEventListener("click", ungroupAllTabs);
 
-refresh();
+if (nameGroupsToggle) {
+  nameGroupsToggle.addEventListener("change", () => {
+    settings.nameGroups = nameGroupsToggle.checked;
+    saveSettings();
+  });
+}
+if (groupColorSelect) {
+  groupColorSelect.addEventListener("change", () => {
+    settings.groupColor = groupColorSelect.value;
+    saveSettings();
+  });
+}
+if (collapseAfterGroupToggle) {
+  collapseAfterGroupToggle.addEventListener("change", () => {
+    settings.collapseAfterGroup = collapseAfterGroupToggle.checked;
+    saveSettings();
+  });
+}
+if (lastVisitedOrderSelect) {
+  lastVisitedOrderSelect.addEventListener("change", () => {
+    settings.lastVisitedOrder = lastVisitedOrderSelect.value;
+    saveSettings();
+  });
+}
+
+loadSettings().then(refresh);
