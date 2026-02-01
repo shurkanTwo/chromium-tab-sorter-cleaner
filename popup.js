@@ -146,12 +146,8 @@ async function moveTabsByIdOrder(tabIds) {
   }
 }
 
-function buildSortedOrderByGroups(tabs, metaById, comparator) {
+function buildSortedOrderWithGroupBlocks(tabs, metaById, comparator) {
   const topLevel = tabs.filter((tab) => tab.groupId === -1);
-  const sortedTopLevel = [...topLevel].sort((a, b) =>
-    comparator(metaById[a.id], metaById[b.id])
-  );
-
   const groupMap = new Map();
   for (const tab of tabs) {
     if (tab.groupId === -1) continue;
@@ -161,26 +157,43 @@ function buildSortedOrderByGroups(tabs, metaById, comparator) {
   }
 
   const sortedGroups = new Map();
+  const groupRepresentatives = new Map();
   for (const [groupId, list] of groupMap.entries()) {
     const sorted = [...list].sort((a, b) =>
       comparator(metaById[a.id], metaById[b.id])
     );
     sortedGroups.set(groupId, sorted);
+    if (sorted.length > 0) {
+      groupRepresentatives.set(groupId, metaById[sorted[0].id]);
+    }
   }
 
-  const seenGroups = new Set();
-  const desired = [];
-  let topLevelIndex = 0;
+  const blocks = [];
+  for (const tab of topLevel) {
+    blocks.push({ type: "tab", id: tab.id });
+  }
+  for (const groupId of sortedGroups.keys()) {
+    blocks.push({ type: "group", id: groupId });
+  }
 
-  for (const tab of tabs) {
-    if (tab.groupId === -1) {
-      desired.push(sortedTopLevel[topLevelIndex].id);
-      topLevelIndex += 1;
+  blocks.sort((a, b) => {
+    const metaA =
+      a.type === "tab" ? metaById[a.id] : groupRepresentatives.get(a.id);
+    const metaB =
+      b.type === "tab" ? metaById[b.id] : groupRepresentatives.get(b.id);
+    if (!metaA && !metaB) return 0;
+    if (!metaA) return 1;
+    if (!metaB) return -1;
+    return comparator(metaA, metaB);
+  });
+
+  const desired = [];
+  for (const block of blocks) {
+    if (block.type === "tab") {
+      desired.push(block.id);
       continue;
     }
-    if (seenGroups.has(tab.groupId)) continue;
-    seenGroups.add(tab.groupId);
-    const groupTabs = sortedGroups.get(tab.groupId) || [];
+    const groupTabs = sortedGroups.get(block.id) || [];
     for (const groupTab of groupTabs) {
       desired.push(groupTab.id);
     }
@@ -205,7 +218,7 @@ async function sortAlphabetically() {
   });
 
   if (tabs.some((tab) => tab.groupId !== -1)) {
-    const desired = buildSortedOrderByGroups(tabs, metaById, comparator);
+    const desired = buildSortedOrderWithGroupBlocks(tabs, metaById, comparator);
     await moveTabsByIdOrder(desired);
   } else {
     await moveTabsInOrder(sorted);
@@ -229,7 +242,7 @@ async function sortByLastVisited() {
   });
 
   if (tabs.some((tab) => tab.groupId !== -1)) {
-    const desired = buildSortedOrderByGroups(tabs, metaById, comparator);
+    const desired = buildSortedOrderWithGroupBlocks(tabs, metaById, comparator);
     await moveTabsByIdOrder(desired);
   } else {
     await moveTabsInOrder(sorted);
