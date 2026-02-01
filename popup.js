@@ -13,6 +13,7 @@ const ungroupAllButton = document.getElementById("ungroupAll");
 const nameGroupsToggle = document.getElementById("nameGroups");
 const groupColorSelect = document.getElementById("groupColor");
 const collapseAfterGroupToggle = document.getElementById("collapseAfterGroup");
+const lastVisitedOrderSelect = document.getElementById("lastVisitedOrder");
 
 function formatDuration(ms) {
   if (!Number.isFinite(ms)) return "0s";
@@ -37,6 +38,14 @@ function getHostname(url) {
   } catch (error) {
     return "";
   }
+}
+
+function abbreviateDomain(hostname) {
+  if (!hostname) return "";
+  const parts = hostname.split(".").filter(Boolean);
+  if (parts.length === 0) return "";
+  const letters = parts.map((part) => part[0]).join("");
+  return letters.slice(0, 6).toUpperCase();
 }
 
 function getTabTimes() {
@@ -272,16 +281,13 @@ async function sortByLastVisited() {
   const tabsWithMeta = await fetchTabsWithMeta();
   const tabs = await chrome.tabs.query({ currentWindow: true });
   const metaById = new Map(tabsWithMeta.map((meta) => [meta.tab.id, meta]));
+  const descending = lastVisitedOrderSelect.value !== "asc";
   const comparator = (a, b) => {
     const timeA = a.lastVisited || 0;
     const timeB = b.lastVisited || 0;
-    return timeB - timeA;
+    return descending ? timeB - timeA : timeA - timeB;
   };
-  const sorted = [...tabsWithMeta].sort((a, b) => {
-    const timeA = a.lastVisited || 0;
-    const timeB = b.lastVisited || 0;
-    return timeB - timeA;
-  });
+  const sorted = [...tabsWithMeta].sort(comparator);
 
   if (tabs.some((tab) => tab.groupId !== -1)) {
     await sortWithGroups(comparator, metaById);
@@ -324,7 +330,9 @@ async function groupByDomain() {
       createProperties: { windowId: currentWindow.id }
     });
     const updatePayload = {};
-    if (useNames && currentHost) updatePayload.title = currentHost;
+    if (useNames && currentHost) {
+      updatePayload.title = abbreviateDomain(currentHost);
+    }
     if (color) updatePayload.color = color;
     if (collapseAfter) updatePayload.collapsed = true;
     if (Object.keys(updatePayload).length > 0) {
