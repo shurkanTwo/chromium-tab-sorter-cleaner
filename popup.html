@@ -14,6 +14,7 @@
         <button id="sortAlpha">Sort A-Z</button>
         <button id="sortLastVisited">Sort by last visited</button>
         <button id="groupDomain">Group by domain</button>
+        <button id="groupTopic">Group by topic</button>
         <button id="collapseGroups">Collapse groups</button>
         <button id="expandGroups">Expand groups</button>
         <button id="ungroupAll">Ungroup all</button>
@@ -26,8 +27,8 @@
         <label class="option">
           Color
           <select id="groupColor">
-            <option value="">No color</option>
-            <option value="blue" selected>Blue</option>
+            <option value="" selected>No color</option>
+            <option value="blue">Blue</option>
             <option value="red">Red</option>
             <option value="yellow">Yellow</option>
             <option value="green">Green</option>
@@ -47,6 +48,14 @@
           <select id="lastVisitedOrder">
             <option value="desc" selected>Newest first</option>
             <option value="asc">Oldest first</option>
+          </select>
+        </label>
+        <label class="option">
+          Topic sensitivity
+          <select id="topicSensitivity">
+            <option value="low">Low</option>
+            <option value="medium" selected>Medium</option>
+            <option value="high">High</option>
           </select>
         </label>
       </div>

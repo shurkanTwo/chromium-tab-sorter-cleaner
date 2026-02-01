@@ -5,15 +5,17 @@ const detailsBody = document.getElementById("detailsBody");
 const SETTINGS_KEY = "tabSorterSettings";
 const settings = {
   nameGroups: true,
-  groupColor: "blue",
+  groupColor: "",
   collapseAfterGroup: false,
-  lastVisitedOrder: "desc"
+  lastVisitedOrder: "desc",
+  topicSensitivity: "medium"
 };
 
 const closeDuplicatesButton = document.getElementById("closeDuplicates");
 const sortAlphaButton = document.getElementById("sortAlpha");
 const sortLastVisitedButton = document.getElementById("sortLastVisited");
 const groupDomainButton = document.getElementById("groupDomain");
+const groupTopicButton = document.getElementById("groupTopic");
 const collapseGroupsButton = document.getElementById("collapseGroups");
 const expandGroupsButton = document.getElementById("expandGroups");
 const ungroupAllButton = document.getElementById("ungroupAll");
@@ -22,6 +24,7 @@ const nameGroupsToggle = document.getElementById("nameGroups");
 const groupColorSelect = document.getElementById("groupColor");
 const collapseAfterGroupToggle = document.getElementById("collapseAfterGroup");
 const lastVisitedOrderSelect = document.getElementById("lastVisitedOrder");
+const topicSensitivitySelect = document.getElementById("topicSensitivity");
 
 function formatDuration(ms) {
   if (!Number.isFinite(ms)) return "0s";
@@ -56,6 +59,55 @@ function abbreviateDomain(hostname) {
   return letters.slice(0, 6).toUpperCase();
 }
 
+function abbreviateKeyword(keyword) {
+  if (!keyword) return "";
+  return keyword.slice(0, 10).toUpperCase();
+}
+
+function tokenize(text) {
+  if (!text) return [];
+  const cleaned = text.toLowerCase().replace(/[^a-z0-9]+/g, " ");
+  const raw = cleaned.split(" ").filter(Boolean);
+  const stopwords = new Set([
+    "a", "an", "and", "are", "as", "at", "be", "by", "for", "from",
+    "has", "have", "how", "in", "is", "it", "its", "of", "on", "or",
+    "that", "the", "this", "to", "was", "were", "what", "when", "where",
+    "who", "why", "with", "you", "your"
+  ]);
+  return raw.filter((token) => token.length > 1 && !stopwords.has(token));
+}
+
+function buildVector(tokens) {
+  const map = new Map();
+  for (const token of tokens) {
+    map.set(token, (map.get(token) || 0) + 1);
+  }
+  return map;
+}
+
+function cosineSimilarity(a, b) {
+  let dot = 0;
+  let normA = 0;
+  let normB = 0;
+  for (const [key, value] of a.entries()) {
+    normA += value * value;
+    if (b.has(key)) {
+      dot += value * b.get(key);
+    }
+  }
+  for (const value of b.values()) {
+    normB += value * value;
+  }
+  if (normA === 0 || normB === 0) return 0;
+  return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+}
+
+function mergeVectors(target, source) {
+  for (const [key, value] of source.entries()) {
+    target.set(key, (target.get(key) || 0) + value);
+  }
+}
+
 function getTabTimes() {
   return chrome.runtime.sendMessage({ type: "getTabTimes" });
 }
@@ -72,6 +124,9 @@ async function loadSettings() {
   }
   if (lastVisitedOrderSelect) {
     lastVisitedOrderSelect.value = settings.lastVisitedOrder || "desc";
+  }
+  if (topicSensitivitySelect) {
+    topicSensitivitySelect.value = settings.topicSensitivity || "medium";
   }
 }
 
@@ -389,6 +444,100 @@ async function groupByDomain() {
   await refresh();
 }
 
+function pickTopKeyword(vectors) {
+  const counts = new Map();
+  for (const vector of vectors) {
+    for (const [key, value] of vector.entries()) {
+      counts.set(key, (counts.get(key) || 0) + value);
+    }
+  }
+  let best = "";
+  let bestScore = 0;
+  for (const [key, value] of counts.entries()) {
+    if (value > bestScore) {
+      bestScore = value;
+      best = key;
+    }
+  }
+  return best;
+}
+
+function getTopicThreshold() {
+  const value = topicSensitivitySelect
+    ? topicSensitivitySelect.value
+    : settings.topicSensitivity;
+  if (value === "high") return 0.35;
+  if (value === "low") return 0.15;
+  return 0.25;
+}
+
+async function ungroupAllTabsInternal(shouldRefresh) {
+  const tabs = await chrome.tabs.query({ currentWindow: true });
+  const groupedTabs = tabs.filter((tab) => tab.groupId !== -1);
+  if (groupedTabs.length === 0) return;
+  await chrome.tabs.ungroup(groupedTabs.map((tab) => tab.id));
+  if (shouldRefresh) await refresh();
+}
+
+async function groupByTopic() {
+  const tabsWithMeta = await fetchTabsWithMeta();
+  await ungroupAllTabsInternal(false);
+
+  const threshold = getTopicThreshold();
+  const clusters = [];
+
+  for (const meta of tabsWithMeta) {
+    const text = meta.tab.title || meta.tab.url || "";
+    const vector = buildVector(tokenize(text));
+    let bestCluster = null;
+    let bestScore = 0;
+
+    for (const cluster of clusters) {
+      const score = cosineSimilarity(vector, cluster.centroid);
+      if (score >= threshold && score > bestScore) {
+        bestScore = score;
+        bestCluster = cluster;
+      }
+    }
+
+    if (!bestCluster) {
+      const centroid = new Map(vector);
+      clusters.push({ tabs: [meta], vectors: [vector], centroid });
+    } else {
+      bestCluster.tabs.push(meta);
+      bestCluster.vectors.push(vector);
+      mergeVectors(bestCluster.centroid, vector);
+    }
+  }
+
+  const currentWindow = await chrome.windows.getCurrent();
+  const useNames = nameGroupsToggle.checked;
+  const color = groupColorSelect.value;
+  const collapseAfter = collapseAfterGroupToggle.checked;
+
+  for (const cluster of clusters) {
+    if (cluster.tabs.length < 2) continue;
+    const tabIds = cluster.tabs.map((meta) => meta.tab.id);
+    const groupId = await chrome.tabs.group({
+      tabIds,
+      createProperties: { windowId: currentWindow.id }
+    });
+
+    const updatePayload = {};
+    if (useNames) {
+      const keyword = pickTopKeyword(cluster.vectors);
+      updatePayload.title = abbreviateKeyword(keyword || "topic");
+    }
+    if (color) updatePayload.color = color;
+    if (collapseAfter) updatePayload.collapsed = true;
+    if (Object.keys(updatePayload).length > 0) {
+      await chrome.tabGroups.update(groupId, updatePayload);
+    }
+  }
+
+  await refresh();
+}
+
 async function setAllGroupsCollapsed(collapsed) {
   const currentWindow = await chrome.windows.getCurrent();
   const groups = await chrome.tabGroups.query({ windowId: currentWindow.id });
@@ -399,11 +548,7 @@ async function setAllGroupsCollapsed(collapsed) {
 }
 
 async function ungroupAllTabs() {
-  const tabs = await chrome.tabs.query({ currentWindow: true });
-  const groupedTabs = tabs.filter((tab) => tab.groupId !== -1);
-  if (groupedTabs.length === 0) return;
-  await chrome.tabs.ungroup(groupedTabs.map((tab) => tab.id));
-  await refresh();
+  await ungroupAllTabsInternal(true);
 }
 
 async function refresh() {
@@ -415,6 +560,7 @@ closeDuplicatesButton.addEventListener("click", closeDuplicates);
 sortAlphaButton.addEventListener("click", sortAlphabetically);
 sortLastVisitedButton.addEventListener("click", sortByLastVisited);
 groupDomainButton.addEventListener("click", groupByDomain);
+groupTopicButton.addEventListener("click", groupByTopic);
 collapseGroupsButton.addEventListener("click", () => setAllGroupsCollapsed(true));
 expandGroupsButton.addEventListener("click", () => setAllGroupsCollapsed(false));
 ungroupAllButton.addEventListener("click", ungroupAllTabs);
@@ -440,6 +586,12 @@ if (collapseAfterGroupToggle) {
 if (lastVisitedOrderSelect) {
   lastVisitedOrderSelect.addEventListener("change", () => {
     settings.lastVisitedOrder = lastVisitedOrderSelect.value;
+    saveSettings();
+  });
+}
+if (topicSensitivitySelect) {
+  topicSensitivitySelect.addEventListener("change", () => {
+    settings.topicSensitivity = topicSensitivitySelect.value;
     saveSettings();
   });
 }
