@@ -3,7 +3,7 @@
   "name": "Tab Sorter Cleaner",
   "version": "0.1.0",
   "description": "Sort tabs, close duplicates, and inspect recent activity.",
-  "permissions": ["tabs", "history", "storage"],
+  "permissions": ["tabs", "history", "storage", "tabGroups"],
   "action": {
     "default_title": "Tab Sorter",
     "default_popup": "popup.html"

@@ -39,7 +39,7 @@ body {
 
 .actions {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -52,6 +52,32 @@ button {
   font-weight: 600;
   cursor: pointer;
   transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.group-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.option select {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  background: #fffaf3;
 }
 
 button:hover {
@@ -164,6 +190,14 @@ button:active {
   }
 
   .content {
+    grid-template-columns: 1fr;
+  }
+
+  .actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .group-options {
     grid-template-columns: 1fr;
   }
 }

@@ -6,6 +6,12 @@ const closeDuplicatesButton = document.getElementById("closeDuplicates");
 const sortAlphaButton = document.getElementById("sortAlpha");
 const sortLastVisitedButton = document.getElementById("sortLastVisited");
 const groupDomainButton = document.getElementById("groupDomain");
+const collapseGroupsButton = document.getElementById("collapseGroups");
+const expandGroupsButton = document.getElementById("expandGroups");
+
+const nameGroupsToggle = document.getElementById("nameGroups");
+const groupColorSelect = document.getElementById("groupColor");
+const collapseAfterGroupToggle = document.getElementById("collapseAfterGroup");
 
 function formatDuration(ms) {
   if (!Number.isFinite(ms)) return "0s";
@@ -134,27 +140,100 @@ async function moveTabsInOrder(sorted) {
   }
 }
 
+async function moveTabsByIdOrder(tabIds) {
+  for (let index = 0; index < tabIds.length; index += 1) {
+    await chrome.tabs.move(tabIds[index], { index });
+  }
+}
+
+function buildSortedOrderByGroups(tabs, metaById, comparator) {
+  const topLevel = tabs.filter((tab) => tab.groupId === -1);
+  const sortedTopLevel = [...topLevel].sort((a, b) =>
+    comparator(metaById[a.id], metaById[b.id])
+  );
+
+  const groupMap = new Map();
+  for (const tab of tabs) {
+    if (tab.groupId === -1) continue;
+    const list = groupMap.get(tab.groupId) || [];
+    list.push(tab);
+    groupMap.set(tab.groupId, list);
+  }
+
+  const sortedGroups = new Map();
+  for (const [groupId, list] of groupMap.entries()) {
+    const sorted = [...list].sort((a, b) =>
+      comparator(metaById[a.id], metaById[b.id])
+    );
+    sortedGroups.set(groupId, sorted);
+  }
+
+  const seenGroups = new Set();
+  const desired = [];
+  let topLevelIndex = 0;
+
+  for (const tab of tabs) {
+    if (tab.groupId === -1) {
+      desired.push(sortedTopLevel[topLevelIndex].id);
+      topLevelIndex += 1;
+      continue;
+    }
+    if (seenGroups.has(tab.groupId)) continue;
+    seenGroups.add(tab.groupId);
+    const groupTabs = sortedGroups.get(tab.groupId) || [];
+    for (const groupTab of groupTabs) {
+      desired.push(groupTab.id);
+    }
+  }
+
+  return desired;
+}
+
 async function sortAlphabetically() {
   const tabsWithMeta = await fetchTabsWithMeta();
+  const tabs = await chrome.tabs.query({ currentWindow: true });
+  const metaById = new Map(tabsWithMeta.map((meta) => [meta.tab.id, meta]));
+  const comparator = (a, b) => {
+    const titleA = (a.tab.title || a.tab.url || "").toLowerCase();
+    const titleB = (b.tab.title || b.tab.url || "").toLowerCase();
+    return titleA.localeCompare(titleB);
+  };
   const sorted = [...tabsWithMeta].sort((a, b) => {
     const titleA = (a.tab.title || a.tab.url || "").toLowerCase();
     const titleB = (b.tab.title || b.tab.url || "").toLowerCase();
     return titleA.localeCompare(titleB);
   });
 
-  await moveTabsInOrder(sorted);
+  if (tabs.some((tab) => tab.groupId !== -1)) {
+    const desired = buildSortedOrderByGroups(tabs, metaById, comparator);
+    await moveTabsByIdOrder(desired);
+  } else {
+    await moveTabsInOrder(sorted);
+  }
   await refresh();
 }
 
 async function sortByLastVisited() {
   const tabsWithMeta = await fetchTabsWithMeta();
+  const tabs = await chrome.tabs.query({ currentWindow: true });
+  const metaById = new Map(tabsWithMeta.map((meta) => [meta.tab.id, meta]));
+  const comparator = (a, b) => {
+    const timeA = a.lastVisited || 0;
+    const timeB = b.lastVisited || 0;
+    return timeB - timeA;
+  };
   const sorted = [...tabsWithMeta].sort((a, b) => {
     const timeA = a.lastVisited || 0;
     const timeB = b.lastVisited || 0;
     return timeB - timeA;
   });
 
-  await moveTabsInOrder(sorted);
+  if (tabs.some((tab) => tab.groupId !== -1)) {
+    const desired = buildSortedOrderByGroups(tabs, metaById, comparator);
+    await moveTabsByIdOrder(desired);
+  } else {
+    await moveTabsInOrder(sorted);
+  }
   await refresh();
 }
 
@@ -172,6 +251,61 @@ async function groupByDomain() {
   });
 
   await moveTabsInOrder(sorted);
+
+  const currentWindow = await chrome.windows.getCurrent();
+  const useNames = nameGroupsToggle.checked;
+  const color = groupColorSelect.value;
+  const collapseAfter = collapseAfterGroupToggle.checked;
+
+  let currentHost = null;
+  let currentGroupTabs = [];
+
+  async function finalizeGroup() {
+    if (currentGroupTabs.length === 0) {
+      currentGroupTabs = [];
+      return;
+    }
+    const groupId = await chrome.tabs.group({
+      tabIds: currentGroupTabs,
+      createProperties: { windowId: currentWindow.id }
+    });
+    const updatePayload = {};
+    if (useNames && currentHost) updatePayload.title = currentHost;
+    if (color) updatePayload.color = color;
+    if (collapseAfter) updatePayload.collapsed = true;
+    if (Object.keys(updatePayload).length > 0) {
+      await chrome.tabGroups.update(groupId, updatePayload);
+    }
+    currentGroupTabs = [];
+  }
+
+  for (const meta of sorted) {
+    const host = meta.hostname;
+    if (!host) {
+      await finalizeGroup();
+      currentHost = null;
+      continue;
+    }
+    if (currentHost === null) {
+      currentHost = host;
+    }
+    if (host !== currentHost) {
+      await finalizeGroup();
+      currentHost = host;
+    }
+    currentGroupTabs.push(meta.tab.id);
+  }
+  await finalizeGroup();
+
+  await refresh();
+}
+
+async function setAllGroupsCollapsed(collapsed) {
+  const currentWindow = await chrome.windows.getCurrent();
+  const groups = await chrome.tabGroups.query({ windowId: currentWindow.id });
+  await Promise.all(
+    groups.map((group) => chrome.tabGroups.update(group.id, { collapsed }))
+  );
   await refresh();
 }
 
@@ -184,5 +318,7 @@ closeDuplicatesButton.addEventListener("click", closeDuplicates);
 sortAlphaButton.addEventListener("click", sortAlphabetically);
 sortLastVisitedButton.addEventListener("click", sortByLastVisited);
 groupDomainButton.addEventListener("click", groupByDomain);
+collapseGroupsButton.addEventListener("click", () => setAllGroupsCollapsed(true));
+expandGroupsButton.addEventListener("click", () => setAllGroupsCollapsed(false));
 
 refresh();
