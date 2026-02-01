@@ -61,7 +61,8 @@ function abbreviateDomain(hostname) {
 
 function abbreviateKeyword(keyword) {
   if (!keyword) return "";
-  return keyword.slice(0, 10).toUpperCase();
+  if (keyword.length <= 12) return keyword;
+  return `${keyword.slice(0, 11)}…`;
 }
 
 function tokenize(text) {
@@ -444,22 +445,32 @@ async function groupByDomain() {
   await refresh();
 }
 
-function pickTopKeyword(vectors) {
+function titleCase(word) {
+  if (!word) return "";
+  return `${word[0].toUpperCase()}${word.slice(1)}`;
+}
+
+function pickTopKeywords(vectors, limit) {
   const counts = new Map();
   for (const vector of vectors) {
     for (const [key, value] of vector.entries()) {
       counts.set(key, (counts.get(key) || 0) + value);
     }
   }
-  let best = "";
-  let bestScore = 0;
-  for (const [key, value] of counts.entries()) {
-    if (value > bestScore) {
-      bestScore = value;
-      best = key;
-    }
-  }
-  return best;
+  const sorted = Array.from(counts.entries()).sort((a, b) => {
+    if (b[1] !== a[1]) return b[1] - a[1];
+    return b[0].length - a[0].length;
+  });
+  return sorted.slice(0, limit).map(([key]) => key);
+}
+
+function buildTopicLabel(vectors) {
+  const keywords = pickTopKeywords(vectors, 2)
+    .map((word) => titleCase(word))
+    .filter(Boolean);
+  if (keywords.length === 0) return "Topic";
+  const joined = keywords.join(" ");
+  return abbreviateKeyword(joined);
 }
 
 function getTopicThreshold() {
@@ -525,8 +536,7 @@ async function groupByTopic() {
 
     const updatePayload = {};
     if (useNames) {
-      const keyword = pickTopKeyword(cluster.vectors);
-      updatePayload.title = abbreviateKeyword(keyword || "topic");
+      updatePayload.title = buildTopicLabel(cluster.vectors);
     }
     if (color) updatePayload.color = color;
     if (collapseAfter) updatePayload.collapsed = true;
