@@ -1,6 +1,6 @@
 # Release Checklist (Chrome Web Store)
 
-- [ ] Enable GitHub Pages (Settings → Pages → Source: `main` / folder: `/docs`).
+- [x] Enable GitHub Pages (Settings → Pages → Source: `main` / folder: `/docs`).
 - [ ] Copy the published privacy policy URL into the CWS dashboard.
 - [ ] Upload required listing assets:
   - [ ] At least one 1280×800 screenshot.
