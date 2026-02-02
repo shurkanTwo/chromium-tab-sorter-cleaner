@@ -1,6 +1,26 @@
 const tabsList = document.getElementById("tabs");
 const tabCount = document.getElementById("tabCount");
 const detailsBody = document.getElementById("detailsBody");
+let statusMessage = document.getElementById("statusMessage");
+const toolbar = document.querySelector(".toolbar");
+let errorList = document.getElementById("errorList");
+
+if (!statusMessage && toolbar) {
+  statusMessage = document.createElement("div");
+  statusMessage.id = "statusMessage";
+  statusMessage.className = "status";
+  statusMessage.setAttribute("role", "status");
+  statusMessage.setAttribute("aria-live", "polite");
+  toolbar.appendChild(statusMessage);
+}
+if (!errorList && toolbar) {
+  errorList = document.createElement("div");
+  errorList.id = "errorList";
+  errorList.className = "status-errors";
+  errorList.setAttribute("role", "status");
+  errorList.setAttribute("aria-live", "polite");
+  toolbar.appendChild(errorList);
+}
 
 const SETTINGS_KEY = "tabSorterSettings";
 const UNDO_KEY = "tabSorterUndoStack";
@@ -9,7 +29,8 @@ const settings = {
   groupColor: "",
   collapseAfterGroup: false,
   lastVisitedOrder: "desc",
-  topicSensitivity: "medium"
+  topicSensitivity: "medium",
+  activateTabsForContent: false
 };
 
 const closeDuplicatesButton = document.getElementById("closeDuplicates");
@@ -27,6 +48,9 @@ const groupColorSelect = document.getElementById("groupColor");
 const collapseAfterGroupToggle = document.getElementById("collapseAfterGroup");
 const lastVisitedOrderSelect = document.getElementById("lastVisitedOrder");
 const topicSensitivitySelect = document.getElementById("topicSensitivity");
+const activateTabsForContentToggle = document.getElementById(
+  "activateTabsForContent"
+);
 
 const MAX_UNDO = 5;
 const undoStack = [];
@@ -34,6 +58,31 @@ const undoStack = [];
 function getUndoStorage() {
   if (chrome.storage && chrome.storage.session) return chrome.storage.session;
   return chrome.storage.local;
+}
+
+function setStatus(message) {
+  const safeMessage = message || "";
+  if (statusMessage) {
+    statusMessage.textContent = safeMessage;
+  }
+}
+
+function setErrorList(errors) {
+  if (!errorList) return;
+  if (!errors || errors.length === 0) {
+    errorList.textContent = "";
+    return;
+  }
+  const lines = errors.map(
+    (entry) => `• ${entry.reason}${entry.url ? ` — ${entry.url}` : ""}`
+  );
+  errorList.textContent = `Content scan errors:\n${lines.join("\n")}`;
+}
+
+function reportError(context, error) {
+  const message = error?.message ? error.message : String(error || "Unknown error");
+  setStatus(`Error in ${context}: ${message}`);
+  console.error(`Error in ${context}`, error);
 }
 
 async function loadUndoStack() {
@@ -89,9 +138,32 @@ function abbreviateKeyword(keyword) {
   return `${keyword.slice(0, 11)}…`;
 }
 
+const TOKEN_REGEX = (() => {
+  try {
+    return new RegExp("[^\\p{L}\\p{N}]+", "gu");
+  } catch (error) {
+    return /[^a-z0-9]+/g;
+  }
+})();
+
+const MARKS_REGEX = (() => {
+  try {
+    return new RegExp("\\p{M}+", "gu");
+  } catch (error) {
+    return null;
+  }
+})();
+
 function tokenize(text) {
   if (!text) return [];
-  const cleaned = text.toLowerCase().replace(/[^a-z0-9]+/g, " ");
+  let cleaned = text.toLowerCase();
+  if (cleaned.normalize) {
+    cleaned = cleaned.normalize("NFKD");
+  }
+  if (MARKS_REGEX) {
+    cleaned = cleaned.replace(MARKS_REGEX, "");
+  }
+  cleaned = cleaned.replace(TOKEN_REGEX, " ");
   const raw = cleaned.split(" ").filter(Boolean);
   const stopwords = new Set([
     "a", "an", "and", "are", "as", "at", "be", "by", "for", "from",
@@ -108,6 +180,15 @@ function buildVector(tokens) {
     map.set(token, (map.get(token) || 0) + 1);
   }
   return map;
+}
+
+function limitVector(vector, maxKeys) {
+  if (vector.size <= maxKeys) return vector;
+  const sorted = Array.from(vector.entries()).sort((a, b) => {
+    if (b[1] !== a[1]) return b[1] - a[1];
+    return a[0].localeCompare(b[0]);
+  });
+  return new Map(sorted.slice(0, maxKeys));
 }
 
 function cosineSimilarity(a, b) {
@@ -247,18 +328,22 @@ async function restoreState(state) {
 
 async function runWithUndo(action) {
   if (!action) return;
-  if (!undoActionButton) {
+  try {
+    if (!undoActionButton) {
+      await action();
+      return;
+    }
+    const state = await captureState();
+    undoStack.push(state);
+    if (undoStack.length > MAX_UNDO) {
+      undoStack.shift();
+    }
+    setUndoEnabled();
+    await saveUndoStack();
     await action();
-    return;
+  } catch (error) {
+    reportError(action?.name || "action", error);
   }
-  const state = await captureState();
-  undoStack.push(state);
-  if (undoStack.length > MAX_UNDO) {
-    undoStack.shift();
-  }
-  setUndoEnabled();
-  await saveUndoStack();
-  await action();
 }
 
 async function undoLastAction() {
@@ -284,6 +369,10 @@ async function loadSettings() {
   }
   if (topicSensitivitySelect) {
     topicSensitivitySelect.value = settings.topicSensitivity || "medium";
+  }
+  if (activateTabsForContentToggle) {
+    activateTabsForContentToggle.checked =
+      settings.activateTabsForContent || false;
   }
 }
 
@@ -340,6 +429,289 @@ async function fetchTabsWithMeta() {
     }));
 
   return withMeta;
+}
+
+function isScriptableUrl(url) {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return false;
+    }
+    const host = parsed.hostname.toLowerCase();
+    if (
+      host === "chrome.google.com" ||
+      host === "chromewebstore.google.com"
+    ) {
+      return false;
+    }
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
+async function fetchTabContents(tabsWithMeta, maxLength = 6000) {
+  const results = new Map();
+  const errors = [];
+  const stats = {
+    scriptable: 0,
+    attempted: 0,
+    success: 0,
+    empty: 0,
+    timeout: 0,
+    error: 0,
+    noHostPermission: 0,
+    restricted: 0,
+    notComplete: 0,
+    discarded: 0
+  };
+  const activateTabs =
+    activateTabsForContentToggle?.checked ?? settings.activateTabsForContent;
+  const tabs = tabsWithMeta
+    .map((meta) => meta.tab)
+    .filter((tab) => tab && Number.isFinite(tab.id));
+  const eligibleTabs = [];
+  const hostPermissionCache = new Map();
+  for (const tab of tabs) {
+    if (isScriptableUrl(tab.url)) {
+      eligibleTabs.push(tab);
+    } else if (tab?.url) {
+      stats.restricted += 1;
+      errors.push({ url: tab.url, reason: "Restricted URL" });
+    }
+  }
+  stats.scriptable = eligibleTabs.length;
+  if (eligibleTabs.length === 0) {
+    return { contentsByTabId: results, stats, errors };
+  }
+
+  let index = 0;
+  let completed = 0;
+  const total = eligibleTabs.length;
+  const concurrency = activateTabs ? 1 : Math.min(4, eligibleTabs.length);
+  const timeoutMs = 4000;
+  const progressStep = Math.max(1, Math.floor(total / 10));
+  const originalActiveTabId = activateTabs
+    ? (await chrome.tabs.query({ currentWindow: true, active: true }))[0]?.id
+    : null;
+
+  async function hasHostPermission(url) {
+    if (!chrome.permissions?.contains) return null;
+    try {
+      const origin = new URL(url).origin;
+      if (hostPermissionCache.has(origin)) {
+        return hostPermissionCache.get(origin);
+      }
+      const allowed = await chrome.permissions.contains({
+        origins: [`${origin}/*`]
+      });
+      hostPermissionCache.set(origin, allowed);
+      return allowed;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  async function runWithTimeout(promise, ms) {
+    let timer = null;
+    try {
+      return await Promise.race([
+        Promise.resolve(promise),
+        new Promise((resolve) => {
+          timer = setTimeout(() => resolve(null), ms);
+        })
+      ]);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
+  function executeContentScript(tabId) {
+    const payload = {
+      target: { tabId, allFrames: false },
+      func: (limit) => {
+        const primary =
+          document.querySelector("main, article, [role='main']") ||
+          document.body ||
+          document.documentElement;
+        const raw = primary ? primary.textContent || "" : "";
+        return raw.slice(0, limit);
+      },
+      args: [maxLength],
+      injectImmediately: true
+    };
+
+    return new Promise((resolve, reject) => {
+      try {
+        chrome.scripting.executeScript(payload, (result) => {
+          if (chrome.runtime.lastError) {
+            const message =
+              chrome.runtime.lastError.message ||
+              String(chrome.runtime.lastError);
+            reject(new Error(message));
+            return;
+          }
+          resolve(result);
+        });
+      } catch (error) {
+        const message = error?.message ? error.message : String(error || "");
+        if (
+          message.includes("injectImmediately") ||
+          message.includes("Unexpected property") ||
+          message.includes("Invalid")
+        ) {
+          const fallback = { ...payload };
+          delete fallback.injectImmediately;
+          try {
+            chrome.scripting.executeScript(fallback, (result) => {
+              if (chrome.runtime.lastError) {
+                const errMessage =
+                  chrome.runtime.lastError.message ||
+                  String(chrome.runtime.lastError);
+                reject(new Error(errMessage));
+                return;
+              }
+              resolve(result);
+            });
+          } catch (fallbackError) {
+            reject(fallbackError);
+          }
+          return;
+        }
+        reject(error);
+      }
+    });
+  }
+
+  async function activateTab(tabId) {
+    try {
+      await chrome.tabs.update(tabId, { active: true });
+    } catch (error) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+
+  async function getFreshTab(tabId) {
+    try {
+      return await chrome.tabs.get(tabId);
+    } catch (error) {
+      return null;
+    }
+  }
+
+  async function worker() {
+    while (index < eligibleTabs.length) {
+      const tab = eligibleTabs[index];
+      index += 1;
+      try {
+        if (activateTabs) {
+          await activateTab(tab.id);
+        }
+
+        const currentTab = (await getFreshTab(tab.id)) || tab;
+        if (currentTab.discarded) {
+          stats.discarded += 1;
+          errors.push({
+            url: currentTab.url || tab.url || "",
+            reason: "Tab is discarded"
+          });
+          results.set(currentTab.id, "");
+          continue;
+        }
+        if (currentTab.status && currentTab.status !== "complete") {
+          stats.notComplete += 1;
+          errors.push({
+            url: currentTab.url || tab.url || "",
+            reason: `Tab status not complete: ${currentTab.status}`
+          });
+          results.set(currentTab.id, "");
+          continue;
+        }
+        const hasPermission = await hasHostPermission(currentTab.url || "");
+        if (hasPermission === false) {
+          stats.noHostPermission += 1;
+          errors.push({
+            url: currentTab.url || "",
+            reason: "No host permission for this site"
+          });
+          results.set(currentTab.id, "");
+          continue;
+        }
+        stats.attempted += 1;
+        let injected = null;
+        try {
+          injected = await runWithTimeout(
+            executeContentScript(currentTab.id),
+            timeoutMs
+          );
+        } catch (error) {
+          const message = error?.message || String(error || "Unknown");
+          if (message.toLowerCase().includes("cannot access contents")) {
+            stats.restricted += 1;
+            errors.push({
+              url: currentTab.url || "",
+              reason: `Restricted: ${message}`
+            });
+          } else {
+            stats.error += 1;
+            errors.push({
+              url: currentTab.url || "",
+              reason: `Script error: ${message}`
+            });
+          }
+          results.set(currentTab.id, "");
+          continue;
+        }
+        if (!injected) {
+          stats.timeout += 1;
+          errors.push({
+            url: currentTab.url || "",
+            reason: "Content script timed out"
+          });
+          results.set(currentTab.id, "");
+          continue;
+        }
+        const text = injected?.[0]?.result || "";
+        if (text.trim().length > 0) {
+          stats.success += 1;
+        } else {
+          stats.empty += 1;
+        }
+        results.set(currentTab.id, text);
+      } finally {
+        completed += 1;
+        if (completed === total || completed % progressStep === 0) {
+          setStatus(`Scanning content ${completed}/${total}...`);
+        }
+      }
+    }
+  }
+
+  await Promise.all(Array.from({ length: concurrency }, () => worker()));
+  if (activateTabs && originalActiveTabId != null) {
+    try {
+      await chrome.tabs.update(originalActiveTabId, { active: true });
+    } catch (error) {
+      // Ignore focus restore errors.
+    }
+  }
+  return { contentsByTabId: results, stats, errors };
+}
+
+async function ensureContentAccess() {
+  if (!chrome.permissions?.contains || !chrome.permissions?.request) {
+    return false;
+  }
+  const granted = await chrome.permissions.contains({
+    origins: ["<all_urls>"]
+  });
+  if (granted) return true;
+  try {
+    return await chrome.permissions.request({ origins: ["<all_urls>"] });
+  } catch (error) {
+    return false;
+  }
 }
 
 function renderTabs(tabsWithMeta) {
@@ -636,9 +1008,9 @@ function getTopicThreshold() {
   const value = topicSensitivitySelect
     ? topicSensitivitySelect.value
     : settings.topicSensitivity;
-  if (value === "high") return 0.35;
-  if (value === "low") return 0.15;
-  return 0.25;
+  if (value === "high") return 0.18;
+  if (value === "low") return 0.06;
+  return 0.12;
 }
 
 async function ungroupAllTabsInternal(shouldRefresh) {
@@ -650,35 +1022,152 @@ async function ungroupAllTabsInternal(shouldRefresh) {
 }
 
 async function groupByTopic() {
+  const activateTabs =
+    activateTabsForContentToggle?.checked ?? settings.activateTabsForContent;
+  setStatus(
+    `Grouping topics${activateTabs ? " (activating tabs)..." : "..."}`
+  );
+  setErrorList([]);
   const tabsWithMeta = await fetchTabsWithMeta();
+  const safeTabsWithMeta = tabsWithMeta.filter(
+    (meta) => meta && meta.tab && Number.isFinite(meta.tab.id)
+  );
   await ungroupAllTabsInternal(false);
+  let contentByTabId = new Map();
+  let contentStats = {
+    scriptable: 0,
+    attempted: 0,
+    success: 0,
+    empty: 0,
+    timeout: 0,
+    error: 0,
+    noHostPermission: 0,
+    restricted: 0,
+    notComplete: 0,
+    discarded: 0
+  };
+  const hasContentAccess = await ensureContentAccess();
+  if (hasContentAccess) {
+    const contentResult = await fetchTabContents(safeTabsWithMeta);
+    contentByTabId = contentResult.contentsByTabId;
+    contentStats = contentResult.stats;
+    setErrorList(contentResult.errors || []);
+  } else {
+    setStatus(
+      "Enable site access (On all sites) to include page text in topic grouping."
+    );
+    setErrorList([]);
+  }
 
-  const threshold = getTopicThreshold();
-  const clusters = [];
+  function buildVectorForTab(meta, includeContent) {
+    const titleTokens = tokenize(`${meta.tab.title || ""} ${meta.tab.url || ""}`);
+    const vector = buildVector(titleTokens);
+    // Weight title/url terms higher so they don't get drowned by page content.
+    mergeVectors(vector, buildVector(titleTokens));
 
-  for (const meta of tabsWithMeta) {
-    const text = meta.tab.title || meta.tab.url || "";
-    const vector = buildVector(tokenize(text));
-    let bestCluster = null;
-    let bestScore = 0;
+    if (includeContent) {
+      const content = contentByTabId.get(meta.tab.id) || "";
+      if (content) {
+        const contentVector = limitVector(buildVector(tokenize(content)), 40);
+        mergeVectors(vector, contentVector);
+      }
+    }
+    return vector;
+  }
 
-    for (const cluster of clusters) {
-      const score = cosineSimilarity(vector, cluster.centroid);
-      if (score >= threshold && score > bestScore) {
-        bestScore = score;
-        bestCluster = cluster;
+  function clusterTabs(threshold, includeContent) {
+    const clusters = [];
+    for (const meta of safeTabsWithMeta) {
+      const vector = buildVectorForTab(meta, includeContent);
+      let bestCluster = null;
+      let bestScore = 0;
+
+      for (const cluster of clusters) {
+        const score = cosineSimilarity(vector, cluster.centroid);
+        if (score >= threshold && score > bestScore) {
+          bestScore = score;
+          bestCluster = cluster;
+        }
+      }
+
+      if (!bestCluster) {
+        const centroid = new Map(vector);
+        clusters.push({ tabs: [meta], vectors: [vector], centroid });
+      } else {
+        bestCluster.tabs.push(meta);
+        bestCluster.vectors.push(vector);
+        mergeVectors(bestCluster.centroid, vector);
+      }
+    }
+    return clusters;
+  }
+
+  const canUseContent = contentStats.success > 0;
+  let mode = canUseContent ? "content" : "title-only";
+  let thresholdUsed = getTopicThreshold();
+  let clusters = clusterTabs(thresholdUsed, canUseContent);
+  const hasGroups = clusters.some((cluster) => cluster.tabs.length >= 2);
+  if (!hasGroups) {
+    mode = "title-only";
+    thresholdUsed = 0.05;
+    clusters = clusterTabs(thresholdUsed, false);
+  }
+
+  if (!clusters.some((cluster) => cluster.tabs.length >= 2)) {
+    mode = "keyword-fallback";
+    const tokenToTabs = new Map();
+    const tabTokens = new Map();
+
+    for (const meta of safeTabsWithMeta) {
+      const tokens = tokenize(`${meta.tab.title || ""} ${meta.tab.url || ""}`);
+      tabTokens.set(meta.tab.id, tokens);
+      for (const token of tokens) {
+        const list = tokenToTabs.get(token) || [];
+        list.push(meta);
+        tokenToTabs.set(token, list);
       }
     }
 
-    if (!bestCluster) {
-      const centroid = new Map(vector);
-      clusters.push({ tabs: [meta], vectors: [vector], centroid });
-    } else {
-      bestCluster.tabs.push(meta);
-      bestCluster.vectors.push(vector);
-      mergeVectors(bestCluster.centroid, vector);
+    const candidates = Array.from(tokenToTabs.entries())
+      .filter(([, list]) => list.length >= 2)
+      .sort((a, b) => b[1].length - a[1].length);
+
+    const assigned = new Set();
+    const fallbackClusters = [];
+
+    for (const [token, list] of candidates) {
+      const unassigned = list.filter((meta) => !assigned.has(meta.tab.id));
+      if (unassigned.length < 2) continue;
+      unassigned.forEach((meta) => assigned.add(meta.tab.id));
+      const vectors = unassigned.map((meta) =>
+        buildVector(tokenize(`${meta.tab.title || ""} ${meta.tab.url || ""}`))
+      );
+      fallbackClusters.push({ tabs: unassigned, vectors, centroid: new Map() });
+    }
+
+    if (fallbackClusters.length > 0) {
+      clusters = fallbackClusters;
     }
   }
+
+  const groupedClusters = clusters.filter((cluster) => cluster.tabs.length >= 2);
+  const groupedTabIds = new Set();
+  groupedClusters.forEach((cluster) =>
+    cluster.tabs.forEach((meta) => groupedTabIds.add(meta.tab.id))
+  );
+  const thresholdLabel =
+    thresholdUsed == null ? "n/a" : thresholdUsed.toFixed(2);
+  const contentSummary = `Content: ${contentStats.success}/${contentStats.scriptable} ok` +
+    `, empty ${contentStats.empty}, timeout ${contentStats.timeout},` +
+    ` no-host ${contentStats.noHostPermission}, not-complete ${contentStats.notComplete},` +
+    ` error ${contentStats.error}, restricted ${contentStats.restricted},` +
+    ` discarded ${contentStats.discarded}.`;
+  setStatus(
+      `Topic grouping: ${groupedClusters.length} groups, ${groupedTabIds.size}/${safeTabsWithMeta.length} tabs. ` +
+      `Mode: ${mode}. Threshold: ${thresholdLabel}. Content access: ${
+        hasContentAccess ? "yes" : "no"
+      }. ${contentSummary}`
+  );
 
   const currentWindow = await chrome.windows.getCurrent();
   const useNames = nameGroupsToggle.checked;
@@ -775,5 +1264,24 @@ if (topicSensitivitySelect) {
     saveSettings();
   });
 }
+if (activateTabsForContentToggle) {
+  activateTabsForContentToggle.addEventListener("change", () => {
+    settings.activateTabsForContent = activateTabsForContentToggle.checked;
+    saveSettings();
+  });
+}
 
-Promise.all([loadSettings(), loadUndoStack()]).then(refresh);
+window.addEventListener("error", (event) => {
+  reportError("popup", event?.error || event?.message || "Unknown error");
+});
+
+window.addEventListener("unhandledrejection", (event) => {
+  reportError("popup", event?.reason || "Unhandled rejection");
+});
+
+Promise.all([loadSettings(), loadUndoStack()])
+  .then(() => {
+    setStatus("Popup loaded. Ready to group tabs.");
+    return refresh();
+  })
+  .catch((error) => reportError("startup", error));

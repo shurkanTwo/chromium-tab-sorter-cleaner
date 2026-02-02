@@ -85,6 +85,20 @@ button:disabled {
   color: var(--muted);
 }
 
+.status {
+  min-height: 14px;
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.status-errors {
+  font-size: 11px;
+  color: var(--accent-dark);
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+
 .option {
   display: flex;
   align-items: center;

@@ -53,6 +53,10 @@
           </select>
         </label>
         <label class="option">
+          <input type="checkbox" id="activateTabsForContent" />
+          Activate tabs for content scan
+        </label>
+        <label class="option">
           Last visited order
           <select id="lastVisitedOrder">
             <option value="desc" selected>Newest first</option>
@@ -60,6 +64,8 @@
           </select>
         </label>
       </div>
+      <div id="statusMessage" class="status" role="status" aria-live="polite"></div>
+      <div id="errorList" class="status-errors" role="status" aria-live="polite"></div>
     </header>
 
     <main class="content">
