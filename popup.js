@@ -174,12 +174,14 @@ async function fetchTabsWithMeta() {
   const lastVisitedByUrl = await fetchLastVisitedBatch(
     tabs.map((tab) => tab.url)
   );
-  const withMeta = tabs.map((tab) => ({
-    tab,
-    lastVisited: lastVisitedByUrl.get(tab.url) || null,
-    timeSpent: timeByTabId[tab.id] || 0,
-    hostname: getHostname(tab.url)
-  }));
+  const withMeta = tabs
+    .filter((tab) => tab && Number.isFinite(tab.id))
+    .map((tab) => ({
+      tab,
+      lastVisited: lastVisitedByUrl.get(tab.url) || null,
+      timeSpent: timeByTabId[tab.id] || 0,
+      hostname: getHostname(tab.url)
+    }));
 
   return withMeta;
 }
@@ -189,6 +191,7 @@ function renderTabs(tabsWithMeta) {
   tabCount.textContent = tabsWithMeta.length.toString();
 
   tabsWithMeta.forEach((meta) => {
+    if (!meta || !meta.tab) return;
     const li = document.createElement("li");
     li.className = "tab-item";
     li.dataset.tabId = meta.tab.id;
