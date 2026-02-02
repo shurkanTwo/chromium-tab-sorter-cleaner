@@ -79,6 +79,58 @@ chrome.runtime.onStartup.addListener(() => {
   loadState();
 });
 
+async function openActionWindow(sourceTab) {
+  const targetWindowId = sourceTab?.windowId ?? null;
+  const url = chrome.runtime.getURL(
+    targetWindowId != null
+      ? `action_window.html?target=${targetWindowId}`
+      : "action_window.html"
+  );
+  const windows = await chrome.windows.getAll({ populate: true });
+  const existing = windows.find((win) =>
+    win.tabs?.some((tab) => tab.url?.startsWith(chrome.runtime.getURL("action_window.html")))
+  );
+  if (existing) {
+    const tab = existing.tabs.find((t) =>
+      t.url?.startsWith(chrome.runtime.getURL("action_window.html"))
+    );
+    if (tab && tab.url !== url) {
+      await chrome.tabs.update(tab.id, { url });
+    }
+    await chrome.windows.update(existing.id, { focused: true });
+    return;
+  }
+  const width = 840;
+  const height = 720;
+  const lastFocused = await chrome.windows.getLastFocused();
+  const left =
+    Number.isFinite(lastFocused.left) && Number.isFinite(lastFocused.width)
+      ? Math.round(lastFocused.left + (lastFocused.width - width) / 2)
+      : undefined;
+  const top =
+    Number.isFinite(lastFocused.top) && Number.isFinite(lastFocused.height)
+      ? Math.round(lastFocused.top + (lastFocused.height - height) / 2)
+      : undefined;
+  await chrome.windows.create({
+    url,
+    type: "popup",
+    width,
+    height,
+    left,
+    top
+  });
+}
+
+chrome.action.onClicked.addListener((tab) => {
+  openActionWindow(tab);
+});
+
+chrome.commands.onCommand.addListener((command) => {
+  if (command === "_execute_action") {
+    openActionWindow();
+  }
+});
+
 chrome.tabs.onActivated.addListener((activeInfo) => {
   handleActivated(activeInfo);
 });

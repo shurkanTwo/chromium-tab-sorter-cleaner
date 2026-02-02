@@ -6,9 +6,10 @@
     <title>Tab Sorter</title>
     <link rel="stylesheet" href="popup.css" />
   </head>
-  <body>
+  <body class="window">
     <header class="toolbar">
       <div class="title">Tab Sorter Cleaner</div>
+      <button class="target-window" id="targetWindowLabel" type="button"></button>
       <div class="actions">
         <button id="undoAction" class="undo" disabled>Undo last action</button>
         <button id="closeDuplicates">Close duplicates</button>
@@ -80,12 +81,11 @@
         <div id="detailsBody" class="details-body">
           Hover a tab to see last visited and time spent.
         </div>
-        <div class="disclaimer">
-          This extension is provided "as is" without warranty. Use at your own
-          risk.
-        </div>
       </aside>
     </main>
+    <footer class="footer-disclaimer">
+      This extension is provided "as is" without warranty. Use at your own risk.
+    </footer>
 
     <script src="popup.js"></script>
   </body>

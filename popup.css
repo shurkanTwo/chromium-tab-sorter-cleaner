@@ -31,6 +31,13 @@ body {
   overflow: hidden;
 }
 
+body.window {
+  width: 100%;
+  min-width: 720px;
+  height: 100vh;
+  min-height: 640px;
+}
+
 .toolbar {
   padding: 16px 20px;
   border-bottom: 1px solid var(--border);
@@ -44,6 +51,30 @@ body {
   font-weight: 700;
   font-size: 18px;
   letter-spacing: 0.3px;
+}
+
+.target-window {
+  border: 1px solid var(--border);
+  background: #fffaf3;
+  border-radius: 999px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 600;
+  width: fit-content;
+  align-self: flex-start;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.target-window:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+}
+
+.target-window:active {
+  transform: translateY(0);
+  box-shadow: none;
 }
 
 .actions {
@@ -92,12 +123,6 @@ button:disabled {
   line-height: 1.4;
 }
 
-.status-errors {
-  font-size: 11px;
-  color: var(--accent-dark);
-  line-height: 1.4;
-  white-space: pre-wrap;
-}
 
 .option {
   display: flex;
@@ -235,6 +260,16 @@ button:active {
   line-height: 1.4;
   border-top: 1px dashed var(--border);
   padding-top: 8px;
+}
+
+.footer-disclaimer {
+  margin-top: auto;
+  padding: 10px 20px 16px;
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.4;
+  border-top: 1px dashed var(--border);
+  background: var(--panel);
 }
 
 .badge {

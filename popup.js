@@ -1,26 +1,13 @@
 const tabsList = document.getElementById("tabs");
 const tabCount = document.getElementById("tabCount");
 const detailsBody = document.getElementById("detailsBody");
-let statusMessage = document.getElementById("statusMessage");
-const toolbar = document.querySelector(".toolbar");
-let errorList = document.getElementById("errorList");
-
-if (!statusMessage && toolbar) {
-  statusMessage = document.createElement("div");
-  statusMessage.id = "statusMessage";
-  statusMessage.className = "status";
-  statusMessage.setAttribute("role", "status");
-  statusMessage.setAttribute("aria-live", "polite");
-  toolbar.appendChild(statusMessage);
-}
-if (!errorList && toolbar) {
-  errorList = document.createElement("div");
-  errorList.id = "errorList";
-  errorList.className = "status-errors";
-  errorList.setAttribute("role", "status");
-  errorList.setAttribute("aria-live", "polite");
-  toolbar.appendChild(errorList);
-}
+const statusMessage = document.getElementById("statusMessage");
+const targetWindowLabel = document.getElementById("targetWindowLabel");
+const targetWindowIdParam = Number.parseInt(
+  new URLSearchParams(window.location.search).get("target") || "",
+  10
+);
+const hasTargetWindowId = Number.isFinite(targetWindowIdParam);
 
 const SETTINGS_KEY = "tabSorterSettings";
 const UNDO_KEY = "tabSorterUndoStack";
@@ -60,29 +47,62 @@ function getUndoStorage() {
   return chrome.storage.local;
 }
 
-function setStatus(message) {
-  const safeMessage = message || "";
-  if (statusMessage) {
-    statusMessage.textContent = safeMessage;
+async function getTargetWindowId() {
+  if (hasTargetWindowId) return targetWindowIdParam;
+  const current = await chrome.windows.getCurrent();
+  return current.id;
+}
+
+async function updateTargetWindowLabel() {
+  if (!targetWindowLabel) return;
+  const targetId = await getTargetWindowId();
+  targetWindowLabel.textContent = `Target window: ${targetId}`;
+}
+
+async function focusTargetWindow() {
+  try {
+    const targetId = await getTargetWindowId();
+    const currentWindow = await chrome.windows.getCurrent();
+    await chrome.windows.update(targetId, { focused: true });
+    await sleep(150);
+    await chrome.windows.update(currentWindow.id, { focused: true });
+  } catch (error) {
+    reportError("focusTargetWindow", error);
   }
 }
 
-function setErrorList(errors) {
-  if (!errorList) return;
-  if (!errors || errors.length === 0) {
-    errorList.textContent = "";
-    return;
-  }
-  const lines = errors.map(
-    (entry) => `• ${entry.reason}${entry.url ? ` — ${entry.url}` : ""}`
-  );
-  errorList.textContent = `Content scan errors:\n${lines.join("\n")}`;
+function getToggleValue(toggle, fallback) {
+  return toggle ? toggle.checked : fallback;
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function getActiveTabId() {
+  const windowId = await getTargetWindowId();
+  const [tab] = await chrome.tabs.query({ windowId, active: true });
+  return tab?.id ?? null;
+}
+
+function isValidTabMeta(meta) {
+  return Boolean(meta && meta.tab && Number.isFinite(meta.tab.id));
+}
+
+function getTitleText(meta) {
+  const title = meta.tab.title || "";
+  const url = meta.tab.url || "";
+  return `${title} ${url}`.trim();
+}
+
+function setStatus(message) {
+  if (!statusMessage) return;
+  statusMessage.textContent = message || "";
 }
 
 function reportError(context, error) {
   const message = error?.message ? error.message : String(error || "Unknown error");
   setStatus(`Error in ${context}: ${message}`);
-  console.error(`Error in ${context}`, error);
 }
 
 async function loadUndoStack() {
@@ -174,12 +194,24 @@ function tokenize(text) {
   return raw.filter((token) => token.length > 1 && !stopwords.has(token));
 }
 
+function getTitleTokens(meta) {
+  return tokenize(getTitleText(meta));
+}
+
 function buildVector(tokens) {
   const map = new Map();
   for (const token of tokens) {
     map.set(token, (map.get(token) || 0) + 1);
   }
   return map;
+}
+
+function buildTitleVector(meta) {
+  const vector = buildVector(getTitleTokens(meta));
+  for (const [key, value] of vector.entries()) {
+    vector.set(key, value * 2);
+  }
+  return vector;
 }
 
 function limitVector(vector, maxKeys) {
@@ -224,14 +256,14 @@ function setUndoEnabled() {
 }
 
 async function captureState() {
-  const currentWindow = await chrome.windows.getCurrent();
+  const windowId = await getTargetWindowId();
   const [tabs, groups] = await Promise.all([
-    chrome.tabs.query({ windowId: currentWindow.id }),
-    chrome.tabGroups.query({ windowId: currentWindow.id })
+    chrome.tabs.query({ windowId }),
+    chrome.tabGroups.query({ windowId })
   ]);
 
   return {
-    windowId: currentWindow.id,
+    windowId,
     capturedAt: Date.now(),
     tabs: tabs.map((tab) => ({
       id: tab.id,
@@ -253,8 +285,8 @@ async function captureState() {
 
 async function restoreState(state) {
   if (!state) return;
-  const currentWindow = await chrome.windows.getCurrent();
-  const tabsNow = await chrome.tabs.query({ windowId: currentWindow.id });
+  const windowId = await getTargetWindowId();
+  const tabsNow = await chrome.tabs.query({ windowId });
   const tabsById = new Map(tabsNow.map((tab) => [tab.id, tab]));
   const desiredEntries = [];
 
@@ -262,7 +294,7 @@ async function restoreState(state) {
     let tab = tabsById.get(entry.id);
     if (!tab) {
       tab = await chrome.tabs.create({
-        windowId: currentWindow.id,
+        windowId,
         url: entry.url || "chrome://newtab",
         index: desiredEntries.length,
         pinned: entry.pinned,
@@ -302,7 +334,7 @@ async function restoreState(state) {
   for (const [oldGroupId, tabIds] of groupsByOldId.entries()) {
     const newGroupId = await chrome.tabs.group({
       tabIds,
-      createProperties: { windowId: currentWindow.id }
+      createProperties: { windowId }
     });
     const meta = groupMetaById.get(oldGroupId);
     if (meta) {
@@ -410,8 +442,9 @@ async function fetchLastVisitedBatch(urls) {
 }
 
 async function fetchTabsWithMeta() {
+  const windowId = await getTargetWindowId();
   const [tabs, timeData] = await Promise.all([
-    chrome.tabs.query({ currentWindow: true }),
+    chrome.tabs.query({ windowId }),
     getTabTimes()
   ]);
 
@@ -420,7 +453,7 @@ async function fetchTabsWithMeta() {
     tabs.map((tab) => tab.url)
   );
   const withMeta = tabs
-    .filter((tab) => tab && Number.isFinite(tab.id))
+    .filter((tab) => tab && Number.isFinite(tab.id) && !tab.pinned)
     .map((tab) => ({
       tab,
       lastVisited: lastVisitedByUrl.get(tab.url) || null,
@@ -452,48 +485,38 @@ function isScriptableUrl(url) {
 
 async function fetchTabContents(tabsWithMeta, maxLength = 6000) {
   const results = new Map();
-  const errors = [];
   const stats = {
-    scriptable: 0,
-    attempted: 0,
+    eligible: 0,
     success: 0,
-    empty: 0,
-    timeout: 0,
-    error: 0,
-    noHostPermission: 0,
-    restricted: 0,
-    notComplete: 0,
-    discarded: 0
+    restricted: 0
   };
-  const activateTabs =
-    activateTabsForContentToggle?.checked ?? settings.activateTabsForContent;
+  const activateTabs = getToggleValue(
+    activateTabsForContentToggle,
+    settings.activateTabsForContent
+  );
   const tabs = tabsWithMeta
-    .map((meta) => meta.tab)
-    .filter((tab) => tab && Number.isFinite(tab.id));
+    .filter(isValidTabMeta)
+    .map((meta) => meta.tab);
   const eligibleTabs = [];
   const hostPermissionCache = new Map();
+
   for (const tab of tabs) {
     if (isScriptableUrl(tab.url)) {
       eligibleTabs.push(tab);
     } else if (tab?.url) {
       stats.restricted += 1;
-      errors.push({ url: tab.url, reason: "Restricted URL" });
     }
   }
-  stats.scriptable = eligibleTabs.length;
+
+  stats.eligible = eligibleTabs.length;
   if (eligibleTabs.length === 0) {
-    return { contentsByTabId: results, stats, errors };
+    return { contentsByTabId: results, stats };
   }
 
   let index = 0;
-  let completed = 0;
-  const total = eligibleTabs.length;
   const concurrency = activateTabs ? 1 : Math.min(4, eligibleTabs.length);
   const timeoutMs = 4000;
-  const progressStep = Math.max(1, Math.floor(total / 10));
-  const originalActiveTabId = activateTabs
-    ? (await chrome.tabs.query({ currentWindow: true, active: true }))[0]?.id
-    : null;
+  const originalActiveTabId = activateTabs ? await getActiveTabId() : null;
 
   async function hasHostPermission(url) {
     if (!chrome.permissions?.contains) return null;
@@ -589,7 +612,7 @@ async function fetchTabContents(tabsWithMeta, maxLength = 6000) {
     } catch (error) {
       return;
     }
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    await sleep(200);
   }
 
   async function getFreshTab(tabId) {
@@ -600,91 +623,43 @@ async function fetchTabContents(tabsWithMeta, maxLength = 6000) {
     }
   }
 
+  async function scanTab(tab) {
+    if (activateTabs) {
+      await activateTab(tab.id);
+    }
+
+    const currentTab = (await getFreshTab(tab.id)) || tab;
+    if (currentTab.discarded) return;
+    if (currentTab.status && currentTab.status !== "complete") return;
+    const hasPermission = await hasHostPermission(currentTab.url || "");
+    if (hasPermission === false) return;
+
+    let injected = null;
+    try {
+      injected = await runWithTimeout(
+        executeContentScript(currentTab.id),
+        timeoutMs
+      );
+    } catch (error) {
+      const message = error?.message || String(error || "");
+      if (message.toLowerCase().includes("cannot access contents")) {
+        stats.restricted += 1;
+      }
+      return;
+    }
+    if (!injected) return;
+    const text = injected?.[0]?.result || "";
+    if (text.trim().length > 0) {
+      stats.success += 1;
+    }
+    results.set(currentTab.id, text);
+  }
+
   async function worker() {
     while (index < eligibleTabs.length) {
       const tab = eligibleTabs[index];
       index += 1;
-      try {
-        if (activateTabs) {
-          await activateTab(tab.id);
-        }
-
-        const currentTab = (await getFreshTab(tab.id)) || tab;
-        if (currentTab.discarded) {
-          stats.discarded += 1;
-          errors.push({
-            url: currentTab.url || tab.url || "",
-            reason: "Tab is discarded"
-          });
-          results.set(currentTab.id, "");
-          continue;
-        }
-        if (currentTab.status && currentTab.status !== "complete") {
-          stats.notComplete += 1;
-          errors.push({
-            url: currentTab.url || tab.url || "",
-            reason: `Tab status not complete: ${currentTab.status}`
-          });
-          results.set(currentTab.id, "");
-          continue;
-        }
-        const hasPermission = await hasHostPermission(currentTab.url || "");
-        if (hasPermission === false) {
-          stats.noHostPermission += 1;
-          errors.push({
-            url: currentTab.url || "",
-            reason: "No host permission for this site"
-          });
-          results.set(currentTab.id, "");
-          continue;
-        }
-        stats.attempted += 1;
-        let injected = null;
-        try {
-          injected = await runWithTimeout(
-            executeContentScript(currentTab.id),
-            timeoutMs
-          );
-        } catch (error) {
-          const message = error?.message || String(error || "Unknown");
-          if (message.toLowerCase().includes("cannot access contents")) {
-            stats.restricted += 1;
-            errors.push({
-              url: currentTab.url || "",
-              reason: `Restricted: ${message}`
-            });
-          } else {
-            stats.error += 1;
-            errors.push({
-              url: currentTab.url || "",
-              reason: `Script error: ${message}`
-            });
-          }
-          results.set(currentTab.id, "");
-          continue;
-        }
-        if (!injected) {
-          stats.timeout += 1;
-          errors.push({
-            url: currentTab.url || "",
-            reason: "Content script timed out"
-          });
-          results.set(currentTab.id, "");
-          continue;
-        }
-        const text = injected?.[0]?.result || "";
-        if (text.trim().length > 0) {
-          stats.success += 1;
-        } else {
-          stats.empty += 1;
-        }
-        results.set(currentTab.id, text);
-      } finally {
-        completed += 1;
-        if (completed === total || completed % progressStep === 0) {
-          setStatus(`Scanning content ${completed}/${total}...`);
-        }
-      }
+      await scanTab(tab);
     }
   }
 
@@ -696,7 +671,7 @@ async function fetchTabContents(tabsWithMeta, maxLength = 6000) {
       // Ignore focus restore errors.
     }
   }
-  return { contentsByTabId: results, stats, errors };
+  return { contentsByTabId: results, stats };
 }
 
 async function ensureContentAccess() {
@@ -753,11 +728,13 @@ function renderTabs(tabsWithMeta) {
 }
 
 async function closeDuplicates() {
-  const tabs = await chrome.tabs.query({ currentWindow: true });
+  const windowId = await getTargetWindowId();
+  const tabs = await chrome.tabs.query({ windowId });
+  const candidates = tabs.filter((tab) => tab && !tab.pinned);
   const seen = new Map();
   const toClose = [];
 
-  tabs.forEach((tab) => {
+  candidates.forEach((tab) => {
     const url = tab.url;
     if (!url) return;
     if (seen.has(url)) {
@@ -775,18 +752,26 @@ async function closeDuplicates() {
 }
 
 async function moveTabsInOrder(sorted) {
+  const windowId = await getTargetWindowId();
+  const pinnedCount = (await chrome.tabs.query({
+    windowId,
+    pinned: true
+  })).length;
   for (let index = 0; index < sorted.length; index += 1) {
     const tab = sorted[index].tab;
-    await chrome.tabs.move(tab.id, { index });
+    await chrome.tabs.move(tab.id, { index: pinnedCount + index });
   }
 }
 
 async function sortWithGroups(comparator, metaById) {
-  const tabs = await chrome.tabs.query({ currentWindow: true });
+  const windowId = await getTargetWindowId();
+  const tabs = await chrome.tabs.query({ windowId });
+  const pinnedCount = tabs.filter((tab) => tab.pinned).length;
+  const candidates = tabs.filter((tab) => !tab.pinned);
   const groupMap = new Map();
   const topLevel = [];
 
-  for (const tab of tabs) {
+  for (const tab of candidates) {
     if (tab.groupId === -1) {
       topLevel.push(tab);
       continue;
@@ -817,11 +802,12 @@ async function sortWithGroups(comparator, metaById) {
     }
   }
 
-  const refreshed = await chrome.tabs.query({ currentWindow: true });
+  const refreshed = await chrome.tabs.query({ windowId });
   const refreshedGroupMap = new Map();
   const refreshedTopLevel = [];
 
   for (const tab of refreshed) {
+    if (tab.pinned) continue;
     if (tab.groupId === -1) {
       refreshedTopLevel.push(tab);
       continue;
@@ -859,18 +845,19 @@ async function sortWithGroups(comparator, metaById) {
   let targetIndex = 0;
   for (const block of blocks) {
     if (block.type === "tab") {
-      await chrome.tabs.move(block.id, { index: targetIndex });
+      await chrome.tabs.move(block.id, { index: pinnedCount + targetIndex });
       targetIndex += 1;
       continue;
     }
-    await chrome.tabGroups.move(block.id, { index: targetIndex });
+    await chrome.tabGroups.move(block.id, { index: pinnedCount + targetIndex });
     targetIndex += block.size || 0;
   }
 }
 
 async function sortAlphabetically() {
   const tabsWithMeta = await fetchTabsWithMeta();
-  const tabs = await chrome.tabs.query({ currentWindow: true });
+  const windowId = await getTargetWindowId();
+  const tabs = await chrome.tabs.query({ windowId });
   const metaById = new Map(tabsWithMeta.map((meta) => [meta.tab.id, meta]));
   const comparator = (a, b) => {
     const titleA = (a.tab.title || a.tab.url || "").toLowerCase();
@@ -893,7 +880,8 @@ async function sortAlphabetically() {
 
 async function sortByLastVisited() {
   const tabsWithMeta = await fetchTabsWithMeta();
-  const tabs = await chrome.tabs.query({ currentWindow: true });
+  const windowId = await getTargetWindowId();
+  const tabs = await chrome.tabs.query({ windowId });
   const metaById = new Map(tabsWithMeta.map((meta) => [meta.tab.id, meta]));
   const descending = lastVisitedOrderSelect.value !== "asc";
   const comparator = (a, b) => {
@@ -926,7 +914,7 @@ async function groupByDomain() {
 
   await moveTabsInOrder(sorted);
 
-  const currentWindow = await chrome.windows.getCurrent();
+  const windowId = await getTargetWindowId();
   const useNames = nameGroupsToggle.checked;
   const color = groupColorSelect.value;
   const collapseAfter = collapseAfterGroupToggle.checked;
@@ -941,7 +929,7 @@ async function groupByDomain() {
     }
     const groupId = await chrome.tabs.group({
       tabIds: currentGroupTabs,
-      createProperties: { windowId: currentWindow.id }
+      createProperties: { windowId }
     });
     const updatePayload = {};
     if (useNames && currentHost) {
@@ -1008,62 +996,46 @@ function getTopicThreshold() {
   const value = topicSensitivitySelect
     ? topicSensitivitySelect.value
     : settings.topicSensitivity;
-  if (value === "high") return 0.18;
-  if (value === "low") return 0.06;
-  return 0.12;
+  if (value === "high") return 0.22;
+  if (value === "low") return 0.1;
+  return 0.16;
 }
 
 async function ungroupAllTabsInternal(shouldRefresh) {
-  const tabs = await chrome.tabs.query({ currentWindow: true });
-  const groupedTabs = tabs.filter((tab) => tab.groupId !== -1);
+  const windowId = await getTargetWindowId();
+  const tabs = await chrome.tabs.query({ windowId });
+  const groupedTabs = tabs.filter(
+    (tab) => !tab.pinned && tab.groupId !== -1
+  );
   if (groupedTabs.length === 0) return;
   await chrome.tabs.ungroup(groupedTabs.map((tab) => tab.id));
   if (shouldRefresh) await refresh();
 }
 
 async function groupByTopic() {
-  const activateTabs =
-    activateTabsForContentToggle?.checked ?? settings.activateTabsForContent;
-  setStatus(
-    `Grouping topics${activateTabs ? " (activating tabs)..." : "..."}`
+  const activateTabs = getToggleValue(
+    activateTabsForContentToggle,
+    settings.activateTabsForContent
   );
-  setErrorList([]);
+  setStatus(`Grouping topics${activateTabs ? " (activating tabs)..." : "..."}`);
   const tabsWithMeta = await fetchTabsWithMeta();
-  const safeTabsWithMeta = tabsWithMeta.filter(
-    (meta) => meta && meta.tab && Number.isFinite(meta.tab.id)
-  );
+  const safeTabsWithMeta = tabsWithMeta.filter(isValidTabMeta);
   await ungroupAllTabsInternal(false);
   let contentByTabId = new Map();
   let contentStats = {
-    scriptable: 0,
-    attempted: 0,
+    eligible: 0,
     success: 0,
-    empty: 0,
-    timeout: 0,
-    error: 0,
-    noHostPermission: 0,
-    restricted: 0,
-    notComplete: 0,
-    discarded: 0
+    restricted: 0
   };
   const hasContentAccess = await ensureContentAccess();
   if (hasContentAccess) {
     const contentResult = await fetchTabContents(safeTabsWithMeta);
     contentByTabId = contentResult.contentsByTabId;
     contentStats = contentResult.stats;
-    setErrorList(contentResult.errors || []);
-  } else {
-    setStatus(
-      "Enable site access (On all sites) to include page text in topic grouping."
-    );
-    setErrorList([]);
   }
 
   function buildVectorForTab(meta, includeContent) {
-    const titleTokens = tokenize(`${meta.tab.title || ""} ${meta.tab.url || ""}`);
-    const vector = buildVector(titleTokens);
-    // Weight title/url terms higher so they don't get drowned by page content.
-    mergeVectors(vector, buildVector(titleTokens));
+    const vector = buildTitleVector(meta);
 
     if (includeContent) {
       const content = contentByTabId.get(meta.tab.id) || "";
@@ -1103,24 +1075,19 @@ async function groupByTopic() {
   }
 
   const canUseContent = contentStats.success > 0;
-  let mode = canUseContent ? "content" : "title-only";
   let thresholdUsed = getTopicThreshold();
   let clusters = clusterTabs(thresholdUsed, canUseContent);
   const hasGroups = clusters.some((cluster) => cluster.tabs.length >= 2);
   if (!hasGroups) {
-    mode = "title-only";
-    thresholdUsed = 0.05;
+    thresholdUsed = 0.08;
     clusters = clusterTabs(thresholdUsed, false);
   }
 
   if (!clusters.some((cluster) => cluster.tabs.length >= 2)) {
-    mode = "keyword-fallback";
     const tokenToTabs = new Map();
-    const tabTokens = new Map();
 
     for (const meta of safeTabsWithMeta) {
-      const tokens = tokenize(`${meta.tab.title || ""} ${meta.tab.url || ""}`);
-      tabTokens.set(meta.tab.id, tokens);
+      const tokens = getTitleTokens(meta);
       for (const token of tokens) {
         const list = tokenToTabs.get(token) || [];
         list.push(meta);
@@ -1140,7 +1107,7 @@ async function groupByTopic() {
       if (unassigned.length < 2) continue;
       unassigned.forEach((meta) => assigned.add(meta.tab.id));
       const vectors = unassigned.map((meta) =>
-        buildVector(tokenize(`${meta.tab.title || ""} ${meta.tab.url || ""}`))
+        buildVector(getTitleTokens(meta))
       );
       fallbackClusters.push({ tabs: unassigned, vectors, centroid: new Map() });
     }
@@ -1155,21 +1122,20 @@ async function groupByTopic() {
   groupedClusters.forEach((cluster) =>
     cluster.tabs.forEach((meta) => groupedTabIds.add(meta.tab.id))
   );
-  const thresholdLabel =
-    thresholdUsed == null ? "n/a" : thresholdUsed.toFixed(2);
-  const contentSummary = `Content: ${contentStats.success}/${contentStats.scriptable} ok` +
-    `, empty ${contentStats.empty}, timeout ${contentStats.timeout},` +
-    ` no-host ${contentStats.noHostPermission}, not-complete ${contentStats.notComplete},` +
-    ` error ${contentStats.error}, restricted ${contentStats.restricted},` +
-    ` discarded ${contentStats.discarded}.`;
+  const contentSummary = hasContentAccess
+    ? (contentStats.eligible > 0
+      ? `Content: ${contentStats.success}/${contentStats.eligible}`
+      : "Content: off")
+    : "Content: off (allow site access)";
+  const restrictedSummary = contentStats.restricted
+    ? `, ${contentStats.restricted} restricted`
+    : "";
   setStatus(
-      `Topic grouping: ${groupedClusters.length} groups, ${groupedTabIds.size}/${safeTabsWithMeta.length} tabs. ` +
-      `Mode: ${mode}. Threshold: ${thresholdLabel}. Content access: ${
-        hasContentAccess ? "yes" : "no"
-      }. ${contentSummary}`
+    `Topic grouping: ${groupedClusters.length} groups, ${groupedTabIds.size}/${safeTabsWithMeta.length} tabs. ` +
+      `${contentSummary}${restrictedSummary}.`
   );
 
-  const currentWindow = await chrome.windows.getCurrent();
+  const windowId = await getTargetWindowId();
   const useNames = nameGroupsToggle.checked;
   const color = groupColorSelect.value;
   const collapseAfter = collapseAfterGroupToggle.checked;
@@ -1179,7 +1145,7 @@ async function groupByTopic() {
     const tabIds = cluster.tabs.map((meta) => meta.tab.id);
     const groupId = await chrome.tabs.group({
       tabIds,
-      createProperties: { windowId: currentWindow.id }
+      createProperties: { windowId }
     });
 
     const updatePayload = {};
@@ -1197,8 +1163,8 @@ async function groupByTopic() {
 }
 
 async function setAllGroupsCollapsed(collapsed) {
-  const currentWindow = await chrome.windows.getCurrent();
-  const groups = await chrome.tabGroups.query({ windowId: currentWindow.id });
+  const windowId = await getTargetWindowId();
+  const groups = await chrome.tabGroups.query({ windowId });
   await Promise.all(
     groups.map((group) => chrome.tabGroups.update(group.id, { collapsed }))
   );
@@ -1270,6 +1236,9 @@ if (activateTabsForContentToggle) {
     saveSettings();
   });
 }
+if (targetWindowLabel) {
+  targetWindowLabel.addEventListener("click", focusTargetWindow);
+}
 
 window.addEventListener("error", (event) => {
   reportError("popup", event?.error || event?.message || "Unknown error");
@@ -1280,8 +1249,8 @@ window.addEventListener("unhandledrejection", (event) => {
 });
 
 Promise.all([loadSettings(), loadUndoStack()])
-  .then(() => {
-    setStatus("Popup loaded. Ready to group tabs.");
-    return refresh();
+  .then(async () => {
+    await refresh();
+    await updateTargetWindowLabel();
   })
   .catch((error) => reportError("startup", error));
