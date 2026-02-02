@@ -3,6 +3,7 @@ const tabCount = document.getElementById("tabCount");
 const detailsBody = document.getElementById("detailsBody");
 
 const SETTINGS_KEY = "tabSorterSettings";
+const UNDO_KEY = "tabSorterUndoStack";
 const settings = {
   nameGroups: true,
   groupColor: "",
@@ -19,12 +20,35 @@ const groupTopicButton = document.getElementById("groupTopic");
 const collapseGroupsButton = document.getElementById("collapseGroups");
 const expandGroupsButton = document.getElementById("expandGroups");
 const ungroupAllButton = document.getElementById("ungroupAll");
+const undoActionButton = document.getElementById("undoAction");
 
 const nameGroupsToggle = document.getElementById("nameGroups");
 const groupColorSelect = document.getElementById("groupColor");
 const collapseAfterGroupToggle = document.getElementById("collapseAfterGroup");
 const lastVisitedOrderSelect = document.getElementById("lastVisitedOrder");
 const topicSensitivitySelect = document.getElementById("topicSensitivity");
+
+const MAX_UNDO = 5;
+const undoStack = [];
+
+function getUndoStorage() {
+  if (chrome.storage && chrome.storage.session) return chrome.storage.session;
+  return chrome.storage.local;
+}
+
+async function loadUndoStack() {
+  const storage = getUndoStorage();
+  const data = await storage.get([UNDO_KEY]);
+  if (Array.isArray(data[UNDO_KEY])) {
+    undoStack.splice(0, undoStack.length, ...data[UNDO_KEY]);
+  }
+  setUndoEnabled();
+}
+
+async function saveUndoStack() {
+  const storage = getUndoStorage();
+  await storage.set({ [UNDO_KEY]: undoStack });
+}
 
 function formatDuration(ms) {
   if (!Number.isFinite(ms)) return "0s";
@@ -111,6 +135,138 @@ function mergeVectors(target, source) {
 
 function getTabTimes() {
   return chrome.runtime.sendMessage({ type: "getTabTimes" });
+}
+
+function setUndoEnabled() {
+  if (!undoActionButton) return;
+  undoActionButton.disabled = undoStack.length === 0;
+}
+
+async function captureState() {
+  const currentWindow = await chrome.windows.getCurrent();
+  const [tabs, groups] = await Promise.all([
+    chrome.tabs.query({ windowId: currentWindow.id }),
+    chrome.tabGroups.query({ windowId: currentWindow.id })
+  ]);
+
+  return {
+    windowId: currentWindow.id,
+    capturedAt: Date.now(),
+    tabs: tabs.map((tab) => ({
+      id: tab.id,
+      index: tab.index,
+      groupId: tab.groupId,
+      url: tab.url || "",
+      title: tab.title || "",
+      pinned: tab.pinned,
+      active: tab.active
+    })),
+    groups: groups.map((group) => ({
+      id: group.id,
+      title: group.title || "",
+      color: group.color || "",
+      collapsed: group.collapsed
+    }))
+  };
+}
+
+async function restoreState(state) {
+  if (!state) return;
+  const currentWindow = await chrome.windows.getCurrent();
+  const tabsNow = await chrome.tabs.query({ windowId: currentWindow.id });
+  const tabsById = new Map(tabsNow.map((tab) => [tab.id, tab]));
+  const desiredEntries = [];
+
+  for (const entry of state.tabs) {
+    let tab = tabsById.get(entry.id);
+    if (!tab) {
+      tab = await chrome.tabs.create({
+        windowId: currentWindow.id,
+        url: entry.url || "chrome://newtab",
+        index: desiredEntries.length,
+        pinned: entry.pinned,
+        active: false
+      });
+      tabsById.set(tab.id, tab);
+    } else if (tab.pinned !== entry.pinned) {
+      await chrome.tabs.update(tab.id, { pinned: entry.pinned });
+    }
+    desiredEntries.push({ entry, tabId: tab.id });
+  }
+
+  const idsToUngroup = desiredEntries
+    .map((item) => item.tabId)
+    .filter((id) => {
+      const tab = tabsById.get(id);
+      return tab && tab.groupId !== -1;
+    });
+  if (idsToUngroup.length > 0) {
+    await chrome.tabs.ungroup(idsToUngroup);
+  }
+
+  for (let index = 0; index < desiredEntries.length; index += 1) {
+    await chrome.tabs.move(desiredEntries[index].tabId, { index });
+  }
+
+  const groupsByOldId = new Map();
+  for (const item of desiredEntries) {
+    const groupId = item.entry.groupId;
+    if (groupId === -1) continue;
+    const list = groupsByOldId.get(groupId) || [];
+    list.push(item.tabId);
+    groupsByOldId.set(groupId, list);
+  }
+
+  const groupMetaById = new Map(state.groups.map((group) => [group.id, group]));
+  for (const [oldGroupId, tabIds] of groupsByOldId.entries()) {
+    const newGroupId = await chrome.tabs.group({
+      tabIds,
+      createProperties: { windowId: currentWindow.id }
+    });
+    const meta = groupMetaById.get(oldGroupId);
+    if (meta) {
+      const updatePayload = {};
+      if (meta.title) updatePayload.title = meta.title;
+      if (meta.color) updatePayload.color = meta.color;
+      if (typeof meta.collapsed === "boolean") {
+        updatePayload.collapsed = meta.collapsed;
+      }
+      if (Object.keys(updatePayload).length > 0) {
+        await chrome.tabGroups.update(newGroupId, updatePayload);
+      }
+    }
+  }
+
+  const activeEntry = desiredEntries.find((item) => item.entry.active);
+  if (activeEntry) {
+    await chrome.tabs.update(activeEntry.tabId, { active: true });
+  }
+
+  await refresh();
+}
+
+async function runWithUndo(action) {
+  if (!action) return;
+  if (!undoActionButton) {
+    await action();
+    return;
+  }
+  const state = await captureState();
+  undoStack.push(state);
+  if (undoStack.length > MAX_UNDO) {
+    undoStack.shift();
+  }
+  setUndoEnabled();
+  await saveUndoStack();
+  await action();
+}
+
+async function undoLastAction() {
+  if (undoStack.length === 0) return;
+  const state = undoStack.pop();
+  setUndoEnabled();
+  await saveUndoStack();
+  await restoreState(state);
 }
 
 async function loadSettings() {
@@ -569,14 +725,25 @@ async function refresh() {
   renderTabs(tabsWithMeta);
 }
 
-closeDuplicatesButton.addEventListener("click", closeDuplicates);
-sortAlphaButton.addEventListener("click", sortAlphabetically);
-sortLastVisitedButton.addEventListener("click", sortByLastVisited);
-groupDomainButton.addEventListener("click", groupByDomain);
-groupTopicButton.addEventListener("click", groupByTopic);
-collapseGroupsButton.addEventListener("click", () => setAllGroupsCollapsed(true));
-expandGroupsButton.addEventListener("click", () => setAllGroupsCollapsed(false));
-ungroupAllButton.addEventListener("click", ungroupAllTabs);
+closeDuplicatesButton.addEventListener("click", () =>
+  runWithUndo(closeDuplicates)
+);
+sortAlphaButton.addEventListener("click", () => runWithUndo(sortAlphabetically));
+sortLastVisitedButton.addEventListener("click", () =>
+  runWithUndo(sortByLastVisited)
+);
+groupDomainButton.addEventListener("click", () => runWithUndo(groupByDomain));
+groupTopicButton.addEventListener("click", () => runWithUndo(groupByTopic));
+collapseGroupsButton.addEventListener("click", () =>
+  runWithUndo(() => setAllGroupsCollapsed(true))
+);
+expandGroupsButton.addEventListener("click", () =>
+  runWithUndo(() => setAllGroupsCollapsed(false))
+);
+ungroupAllButton.addEventListener("click", () => runWithUndo(ungroupAllTabs));
+if (undoActionButton) {
+  undoActionButton.addEventListener("click", undoLastAction);
+}
 
 if (nameGroupsToggle) {
   nameGroupsToggle.addEventListener("change", () => {
@@ -609,4 +776,4 @@ if (topicSensitivitySelect) {
   });
 }
 
-loadSettings().then(refresh);
+Promise.all([loadSettings(), loadUndoStack()]).then(refresh);
