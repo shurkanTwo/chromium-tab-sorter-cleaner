@@ -116,11 +116,35 @@ button:disabled {
   color: var(--muted);
 }
 
-.status {
+.status-panel {
+  padding: 10px 20px 14px;
+  border-top: 1px solid var(--border);
+  background: var(--panel);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.status-text {
   min-height: 14px;
   font-size: 11px;
   color: var(--muted);
   line-height: 1.4;
+}
+
+.status-progress {
+  height: 6px;
+  width: 100%;
+  border-radius: 999px;
+  background: #e9e2d7;
+  overflow: hidden;
+}
+
+.status-progress-bar {
+  height: 100%;
+  width: 0%;
+  background: #3aa76d;
+  transition: width 0.2s ease;
 }
 
 
@@ -263,13 +287,26 @@ button:active {
 }
 
 .footer-disclaimer {
-  margin-top: auto;
   padding: 10px 20px 16px;
   font-size: 10px;
   color: var(--muted);
   line-height: 1.4;
   border-top: 1px dashed var(--border);
   background: var(--panel);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.privacy-link {
+  color: var(--accent-dark);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.privacy-link:hover {
+  text-decoration: underline;
 }
 
 .badge {

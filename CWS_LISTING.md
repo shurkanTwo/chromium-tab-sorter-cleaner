@@ -26,3 +26,4 @@ Use the window to:
 ## Privacy
 No data is sold or shared. All data stays local in the browser.
 Privacy policy: `PRIVACY.md`
+Public privacy page: https://shurkantwo.github.io/chromium-tab-sorter-cleaner/

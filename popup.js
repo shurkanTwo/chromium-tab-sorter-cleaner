@@ -2,6 +2,7 @@ const tabsList = document.getElementById("tabs");
 const tabCount = document.getElementById("tabCount");
 const detailsBody = document.getElementById("detailsBody");
 const statusMessage = document.getElementById("statusMessage");
+const statusProgressBar = document.getElementById("statusProgressBar");
 const targetWindowLabel = document.getElementById("targetWindowLabel");
 const targetWindowIdParam = Number.parseInt(
   new URLSearchParams(window.location.search).get("target") || "",
@@ -64,7 +65,7 @@ async function focusTargetWindow() {
     const targetId = await getTargetWindowId();
     const currentWindow = await chrome.windows.getCurrent();
     await chrome.windows.update(targetId, { focused: true });
-    await sleep(150);
+    await sleep(50);
     await chrome.windows.update(currentWindow.id, { focused: true });
   } catch (error) {
     reportError("focusTargetWindow", error);
@@ -98,6 +99,17 @@ function getTitleText(meta) {
 function setStatus(message) {
   if (!statusMessage) return;
   statusMessage.textContent = message || "";
+}
+
+function formatCount(count, singular, plural) {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
+function setProgress(percent) {
+  if (!statusProgressBar) return;
+  const safeValue = Number.isFinite(percent) ? percent : 0;
+  const clamped = Math.min(100, Math.max(0, safeValue));
+  statusProgressBar.style.width = `${clamped}%`;
 }
 
 function reportError(context, error) {
@@ -514,6 +526,7 @@ async function fetchTabContents(tabsWithMeta, maxLength = 6000) {
   }
 
   let index = 0;
+  let completed = 0;
   const concurrency = activateTabs ? 1 : Math.min(4, eligibleTabs.length);
   const timeoutMs = 4000;
   const originalActiveTabId = activateTabs ? await getActiveTabId() : null;
@@ -660,10 +673,16 @@ async function fetchTabContents(tabsWithMeta, maxLength = 6000) {
       const tab = eligibleTabs[index];
       index += 1;
       await scanTab(tab);
+      completed += 1;
+      const progress = eligibleTabs.length
+        ? (completed / eligibleTabs.length) * 100
+        : 0;
+      setProgress(progress);
     }
   }
 
   await Promise.all(Array.from({ length: concurrency }, () => worker()));
+  setProgress(100);
   if (activateTabs && originalActiveTabId != null) {
     try {
       await chrome.tabs.update(originalActiveTabId, { active: true });
@@ -748,6 +767,19 @@ async function closeDuplicates() {
     await chrome.tabs.remove(toClose);
   }
 
+  if (toClose.length > 0) {
+    setStatus(
+      `Closed ${formatCount(toClose.length, "duplicate", "duplicates")} out of ${formatCount(
+        candidates.length,
+        "tab",
+        "tabs"
+      )}.`
+    );
+  } else {
+    setStatus(
+      `No duplicate tabs found in ${formatCount(candidates.length, "tab", "tabs")}.`
+    );
+  }
   await refresh();
 }
 
@@ -875,6 +907,7 @@ async function sortAlphabetically() {
   } else {
     await moveTabsInOrder(sorted);
   }
+  setStatus(`Sorted ${formatCount(tabsWithMeta.length, "tab", "tabs")} A-Z by title.`);
   await refresh();
 }
 
@@ -896,6 +929,13 @@ async function sortByLastVisited() {
   } else {
     await moveTabsInOrder(sorted);
   }
+  setStatus(
+    `Sorted ${formatCount(
+      tabsWithMeta.length,
+      "tab",
+      "tabs"
+    )} by last visited (${descending ? "newest first" : "oldest first"}).`
+  );
   await refresh();
 }
 
@@ -921,6 +961,8 @@ async function groupByDomain() {
 
   let currentHost = null;
   let currentGroupTabs = [];
+  let groupsCreated = 0;
+  let groupedTabs = 0;
 
   async function finalizeGroup() {
     if (currentGroupTabs.length === 0) {
@@ -931,6 +973,8 @@ async function groupByDomain() {
       tabIds: currentGroupTabs,
       createProperties: { windowId }
     });
+    groupsCreated += 1;
+    groupedTabs += currentGroupTabs.length;
     const updatePayload = {};
     if (useNames && currentHost) {
       updatePayload.title = abbreviateDomain(currentHost);
@@ -961,6 +1005,19 @@ async function groupByDomain() {
   }
   await finalizeGroup();
 
+  if (groupsCreated > 0) {
+    setStatus(
+      `Grouped ${formatCount(groupedTabs, "tab", "tabs")} into ${formatCount(
+        groupsCreated,
+        "group",
+        "groups"
+      )} by domain.`
+    );
+  } else {
+    setStatus(
+      `No domain groups created from ${formatCount(sorted.length, "tab", "tabs")}.`
+    );
+  }
   await refresh();
 }
 
@@ -1007,9 +1064,10 @@ async function ungroupAllTabsInternal(shouldRefresh) {
   const groupedTabs = tabs.filter(
     (tab) => !tab.pinned && tab.groupId !== -1
   );
-  if (groupedTabs.length === 0) return;
+  if (groupedTabs.length === 0) return 0;
   await chrome.tabs.ungroup(groupedTabs.map((tab) => tab.id));
   if (shouldRefresh) await refresh();
+  return groupedTabs.length;
 }
 
 async function groupByTopic() {
@@ -1018,6 +1076,7 @@ async function groupByTopic() {
     settings.activateTabsForContent
   );
   setStatus(`Grouping topics${activateTabs ? " (activating tabs)..." : "..."}`);
+  setProgress(0);
   const tabsWithMeta = await fetchTabsWithMeta();
   const safeTabsWithMeta = tabsWithMeta.filter(isValidTabMeta);
   await ungroupAllTabsInternal(false);
@@ -1122,18 +1181,33 @@ async function groupByTopic() {
   groupedClusters.forEach((cluster) =>
     cluster.tabs.forEach((meta) => groupedTabIds.add(meta.tab.id))
   );
-  const contentSummary = hasContentAccess
-    ? (contentStats.eligible > 0
-      ? `Content: ${contentStats.success}/${contentStats.eligible}`
-      : "Content: off")
-    : "Content: off (allow site access)";
-  const restrictedSummary = contentStats.restricted
-    ? `, ${contentStats.restricted} restricted`
-    : "";
-  setStatus(
-    `Topic grouping: ${groupedClusters.length} groups, ${groupedTabIds.size}/${safeTabsWithMeta.length} tabs. ` +
-      `${contentSummary}${restrictedSummary}.`
-  );
+  const statusParts = [
+    `Topic grouping: ${formatCount(
+      groupedClusters.length,
+      "group",
+      "groups"
+    )} from ${formatCount(groupedTabIds.size, "tab", "tabs")} (out of ${formatCount(
+      safeTabsWithMeta.length,
+      "tab",
+      "tabs"
+    )}).`
+  ];
+  if (!hasContentAccess) {
+    statusParts.push("Content scan: off (grant site access).");
+  } else if (contentStats.eligible > 0) {
+    statusParts.push(
+      `Content scan: ${contentStats.success}/${contentStats.eligible} tabs.`
+    );
+  } else {
+    statusParts.push("Content scan: skipped.");
+  }
+  if (contentStats.restricted) {
+    statusParts.push(
+      `Restricted: ${formatCount(contentStats.restricted, "tab", "tabs")}.`
+    );
+  }
+  setStatus(statusParts.join(" "));
+  setProgress(100);
 
   const windowId = await getTargetWindowId();
   const useNames = nameGroupsToggle.checked;
@@ -1168,11 +1242,27 @@ async function setAllGroupsCollapsed(collapsed) {
   await Promise.all(
     groups.map((group) => chrome.tabGroups.update(group.id, { collapsed }))
   );
+  if (groups.length > 0) {
+    setStatus(
+      `${collapsed ? "Collapsed" : "Expanded"} ${formatCount(
+        groups.length,
+        "group",
+        "groups"
+      )}.`
+    );
+  } else {
+    setStatus("No tab groups to update.");
+  }
   await refresh();
 }
 
 async function ungroupAllTabs() {
-  await ungroupAllTabsInternal(true);
+  const ungrouped = await ungroupAllTabsInternal(true);
+  if (ungrouped > 0) {
+    setStatus(`Ungrouped ${formatCount(ungrouped, "tab", "tabs")}.`);
+  } else {
+    setStatus("No grouped tabs to ungroup.");
+  }
 }
 
 async function refresh() {
