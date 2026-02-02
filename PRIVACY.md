@@ -1,9 +1,9 @@
 # Privacy Policy
 
-Last updated: 2026-02-01
+Last updated: 2026-02-02
 
 Tab Sorter Cleaner is a Chromium extension that helps you sort tabs, close
-duplicates, group tabs by domain, and review recent activity.
+duplicates, group tabs by domain or topic, and review recent activity.
 
 ## Data We Access
 
@@ -16,7 +16,8 @@ duplicates, group tabs by domain, and review recent activity.
 ## How We Use Data
 
 - All data is used only to provide the extension features inside your browser.
-- Page text is accessed locally at the time you run topic grouping.
+- Page text is accessed locally at the time you run topic grouping. If enabled,
+  the extension may briefly activate tabs to capture visible text.
 - Tab time data is stored locally using Chrome's `storage.local` API.
 
 ## Data Sharing
