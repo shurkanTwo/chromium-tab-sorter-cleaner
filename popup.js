@@ -25,6 +25,11 @@ const TOPIC_CLUSTER_CONFIG = {
   minSharedTokens: 2,
   minAverageSimilarityFloor: 0.08,
   minAverageSimilarityScale: 0.75,
+  adaptiveThreshold: true,
+  adaptiveTargetSimilarity: 0.12,
+  adaptiveMinThreshold: 0.06,
+  adaptiveMaxThreshold: 0.28,
+  adaptiveMaxPairs: 2000,
   titleKeywordLimit: 3,
   titleIncludeScores: true,
   debugLogGroups: true,
@@ -1361,9 +1366,31 @@ async function groupByTopic() {
     const parent = new Array(metas.length).fill(0).map((_, index) => index);
     const kNearest = TOPIC_CLUSTER_CONFIG.kNearest;
     const minSharedTokens = TOPIC_CLUSTER_CONFIG.minSharedTokens;
+    let effectiveThreshold = threshold;
+    if (TOPIC_CLUSTER_CONFIG.adaptiveThreshold && vectors.length >= 2) {
+      let sum = 0;
+      let count = 0;
+      for (let i = 0; i < vectors.length; i += 1) {
+        for (let j = i + 1; j < vectors.length; j += 1) {
+          sum += cosineSimilarity(vectors[i], vectors[j]);
+          count += 1;
+          if (count >= TOPIC_CLUSTER_CONFIG.adaptiveMaxPairs) break;
+        }
+        if (count >= TOPIC_CLUSTER_CONFIG.adaptiveMaxPairs) break;
+      }
+      const avg = count ? sum / count : 0;
+      if (avg > 0) {
+        const scaled =
+          threshold * (avg / TOPIC_CLUSTER_CONFIG.adaptiveTargetSimilarity);
+        effectiveThreshold = Math.min(
+          TOPIC_CLUSTER_CONFIG.adaptiveMaxThreshold,
+          Math.max(TOPIC_CLUSTER_CONFIG.adaptiveMinThreshold, scaled)
+        );
+      }
+    }
     const minAverageSimilarity = Math.max(
       TOPIC_CLUSTER_CONFIG.minAverageSimilarityFloor,
-      threshold * TOPIC_CLUSTER_CONFIG.minAverageSimilarityScale
+      effectiveThreshold * TOPIC_CLUSTER_CONFIG.minAverageSimilarityScale
     );
 
     function find(index) {
@@ -1407,7 +1434,7 @@ async function groupByTopic() {
     for (let i = 0; i < metas.length; i += 1) {
       for (let j = i + 1; j < metas.length; j += 1) {
         const score = cosineSimilarity(vectors[i], vectors[j]);
-        if (score < threshold) continue;
+        if (score < effectiveThreshold) continue;
         const sharedTokens = countSharedTokens(i, j);
         if (sharedTokens < minSharedTokens) continue;
         neighbors[i].push({ index: j, score });
