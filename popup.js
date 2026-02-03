@@ -39,10 +39,10 @@ const TOPIC_CLUSTER_CONFIG = {
   contentTokenLimit: 30
 };
 const TOPIC_THRESHOLD_CONFIG = {
-  high: 0.22,
-  medium: 0.16,
-  low: 0.1,
-  fallback: 0.08
+  high: 0.18,
+  medium: 0.12,
+  low: 0.08,
+  fallback: 0.06
 };
 
 const closeDuplicatesButton = document.getElementById("closeDuplicates");
