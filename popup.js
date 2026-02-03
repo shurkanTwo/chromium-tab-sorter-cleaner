@@ -1163,30 +1163,50 @@ async function groupByTopic() {
   }
 
   function clusterTabs(threshold, includeContent) {
-    const clusters = [];
-    for (const meta of safeTabsWithMeta) {
-      const vector = buildVectorForTab(meta, includeContent);
-      let bestCluster = null;
-      let bestScore = 0;
+    const metas = safeTabsWithMeta;
+    const vectors = metas.map((meta) => buildVectorForTab(meta, includeContent));
+    const parent = new Array(metas.length).fill(0).map((_, index) => index);
 
-      for (const cluster of clusters) {
-        const score = cosineSimilarity(vector, cluster.centroid);
-        if (score >= threshold && score > bestScore) {
-          bestScore = score;
-          bestCluster = cluster;
+    function find(index) {
+      let root = index;
+      while (parent[root] !== root) root = parent[root];
+      while (parent[index] !== index) {
+        const next = parent[index];
+        parent[index] = root;
+        index = next;
+      }
+      return root;
+    }
+
+    function union(a, b) {
+      const rootA = find(a);
+      const rootB = find(b);
+      if (rootA === rootB) return;
+      parent[rootB] = rootA;
+    }
+
+    for (let i = 0; i < metas.length; i += 1) {
+      for (let j = i + 1; j < metas.length; j += 1) {
+        const score = cosineSimilarity(vectors[i], vectors[j]);
+        if (score >= threshold) {
+          union(i, j);
         }
       }
-
-      if (!bestCluster) {
-        const centroid = new Map(vector);
-        clusters.push({ tabs: [meta], vectors: [vector], centroid });
-      } else {
-        bestCluster.tabs.push(meta);
-        bestCluster.vectors.push(vector);
-        mergeVectors(bestCluster.centroid, vector);
-      }
     }
-    return clusters;
+
+    const clustersByRoot = new Map();
+    for (let i = 0; i < metas.length; i += 1) {
+      const root = find(i);
+      let cluster = clustersByRoot.get(root);
+      if (!cluster) {
+        cluster = { tabs: [], vectors: [] };
+        clustersByRoot.set(root, cluster);
+      }
+      cluster.tabs.push(metas[i]);
+      cluster.vectors.push(vectors[i]);
+    }
+
+    return Array.from(clustersByRoot.values());
   }
 
   const canUseContent = contentStats.success > 0;
