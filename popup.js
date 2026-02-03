@@ -117,6 +117,21 @@ function reportError(context, error) {
   setStatus(`Error in ${context}: ${message}`);
 }
 
+function isMissingTabError(error) {
+  const message = (error?.message || String(error || "")).toLowerCase();
+  return message.includes("no tab with id") || message.includes("unknown tab id");
+}
+
+async function runIgnoringMissingTab(promise, context) {
+  try {
+    return await promise;
+  } catch (error) {
+    if (isMissingTabError(error)) return null;
+    reportError(context, error);
+    return null;
+  }
+}
+
 async function loadUndoStack() {
   const storage = getUndoStorage();
   const data = await storage.get([UNDO_KEY]);
@@ -314,7 +329,10 @@ async function restoreState(state) {
       });
       tabsById.set(tab.id, tab);
     } else if (tab.pinned !== entry.pinned) {
-      await chrome.tabs.update(tab.id, { pinned: entry.pinned });
+      await runIgnoringMissingTab(
+        chrome.tabs.update(tab.id, { pinned: entry.pinned }),
+        "tabs.update"
+      );
     }
     desiredEntries.push({ entry, tabId: tab.id });
   }
@@ -326,11 +344,14 @@ async function restoreState(state) {
       return tab && tab.groupId !== -1;
     });
   if (idsToUngroup.length > 0) {
-    await chrome.tabs.ungroup(idsToUngroup);
+    await runIgnoringMissingTab(chrome.tabs.ungroup(idsToUngroup), "tabs.ungroup");
   }
 
   for (let index = 0; index < desiredEntries.length; index += 1) {
-    await chrome.tabs.move(desiredEntries[index].tabId, { index });
+    await runIgnoringMissingTab(
+      chrome.tabs.move(desiredEntries[index].tabId, { index }),
+      "tabs.move"
+    );
   }
 
   const groupsByOldId = new Map();
@@ -344,10 +365,14 @@ async function restoreState(state) {
 
   const groupMetaById = new Map(state.groups.map((group) => [group.id, group]));
   for (const [oldGroupId, tabIds] of groupsByOldId.entries()) {
-    const newGroupId = await chrome.tabs.group({
-      tabIds,
-      createProperties: { windowId }
-    });
+    const newGroupId = await runIgnoringMissingTab(
+      chrome.tabs.group({
+        tabIds,
+        createProperties: { windowId }
+      }),
+      "tabs.group"
+    );
+    if (newGroupId == null) continue;
     const meta = groupMetaById.get(oldGroupId);
     if (meta) {
       const updatePayload = {};
@@ -357,14 +382,20 @@ async function restoreState(state) {
         updatePayload.collapsed = meta.collapsed;
       }
       if (Object.keys(updatePayload).length > 0) {
-        await chrome.tabGroups.update(newGroupId, updatePayload);
+        await runIgnoringMissingTab(
+          chrome.tabGroups.update(newGroupId, updatePayload),
+          "tabGroups.update"
+        );
       }
     }
   }
 
   const activeEntry = desiredEntries.find((item) => item.entry.active);
   if (activeEntry) {
-    await chrome.tabs.update(activeEntry.tabId, { active: true });
+    await runIgnoringMissingTab(
+      chrome.tabs.update(activeEntry.tabId, { active: true }),
+      "tabs.update"
+    );
   }
 
   await refresh();
@@ -739,7 +770,10 @@ function renderTabs(tabsWithMeta) {
     });
 
     li.addEventListener("click", () => {
-      chrome.tabs.update(meta.tab.id, { active: true });
+      runIgnoringMissingTab(
+        chrome.tabs.update(meta.tab.id, { active: true }),
+        "tabs.update"
+      );
     });
 
     tabsList.appendChild(li);
@@ -791,7 +825,10 @@ async function moveTabsInOrder(sorted) {
   })).length;
   for (let index = 0; index < sorted.length; index += 1) {
     const tab = sorted[index].tab;
-    await chrome.tabs.move(tab.id, { index: pinnedCount + index });
+    await runIgnoringMissingTab(
+      chrome.tabs.move(tab.id, { index: pinnedCount + index }),
+      "tabs.move"
+    );
   }
 }
 
@@ -830,7 +867,10 @@ async function sortWithGroups(comparator, metaById) {
     const startIndex = Math.min(...entry.sortedTabs.map((tab) => tab.index));
     for (let offset = 0; offset < entry.sortedTabs.length; offset += 1) {
       const tab = entry.sortedTabs[offset];
-      await chrome.tabs.move(tab.id, { index: startIndex + offset });
+      await runIgnoringMissingTab(
+        chrome.tabs.move(tab.id, { index: startIndex + offset }),
+        "tabs.move"
+      );
     }
   }
 
@@ -877,7 +917,10 @@ async function sortWithGroups(comparator, metaById) {
   let targetIndex = 0;
   for (const block of blocks) {
     if (block.type === "tab") {
-      await chrome.tabs.move(block.id, { index: pinnedCount + targetIndex });
+      await runIgnoringMissingTab(
+        chrome.tabs.move(block.id, { index: pinnedCount + targetIndex }),
+        "tabs.move"
+      );
       targetIndex += 1;
       continue;
     }
@@ -969,10 +1012,17 @@ async function groupByDomain() {
       currentGroupTabs = [];
       return;
     }
-    const groupId = await chrome.tabs.group({
-      tabIds: currentGroupTabs,
-      createProperties: { windowId }
-    });
+    const groupId = await runIgnoringMissingTab(
+      chrome.tabs.group({
+        tabIds: currentGroupTabs,
+        createProperties: { windowId }
+      }),
+      "tabs.group"
+    );
+    if (groupId == null) {
+      currentGroupTabs = [];
+      return;
+    }
     groupsCreated += 1;
     groupedTabs += currentGroupTabs.length;
     const updatePayload = {};
@@ -982,7 +1032,10 @@ async function groupByDomain() {
     if (color) updatePayload.color = color;
     if (collapseAfter) updatePayload.collapsed = true;
     if (Object.keys(updatePayload).length > 0) {
-      await chrome.tabGroups.update(groupId, updatePayload);
+      await runIgnoringMissingTab(
+        chrome.tabGroups.update(groupId, updatePayload),
+        "tabGroups.update"
+      );
     }
     currentGroupTabs = [];
   }
@@ -1065,7 +1118,10 @@ async function ungroupAllTabsInternal(shouldRefresh) {
     (tab) => !tab.pinned && tab.groupId !== -1
   );
   if (groupedTabs.length === 0) return 0;
-  await chrome.tabs.ungroup(groupedTabs.map((tab) => tab.id));
+  await runIgnoringMissingTab(
+    chrome.tabs.ungroup(groupedTabs.map((tab) => tab.id)),
+    "tabs.ungroup"
+  );
   if (shouldRefresh) await refresh();
   return groupedTabs.length;
 }
@@ -1217,10 +1273,14 @@ async function groupByTopic() {
   for (const cluster of clusters) {
     if (cluster.tabs.length < 2) continue;
     const tabIds = cluster.tabs.map((meta) => meta.tab.id);
-    const groupId = await chrome.tabs.group({
-      tabIds,
-      createProperties: { windowId }
-    });
+    const groupId = await runIgnoringMissingTab(
+      chrome.tabs.group({
+        tabIds,
+        createProperties: { windowId }
+      }),
+      "tabs.group"
+    );
+    if (groupId == null) continue;
 
     const updatePayload = {};
     if (useNames) {
@@ -1229,7 +1289,10 @@ async function groupByTopic() {
     if (color) updatePayload.color = color;
     if (collapseAfter) updatePayload.collapsed = true;
     if (Object.keys(updatePayload).length > 0) {
-      await chrome.tabGroups.update(groupId, updatePayload);
+      await runIgnoringMissingTab(
+        chrome.tabGroups.update(groupId, updatePayload),
+        "tabGroups.update"
+      );
     }
   }
 
