@@ -108,8 +108,29 @@ function isValidTabMeta(meta) {
 
 function getTitleText(meta) {
   const title = meta.tab.title || "";
-  const url = meta.tab.url || "";
-  return `${title} ${url}`.trim();
+  return title.trim();
+}
+
+function getUrlTokens(url) {
+  if (!url) return [];
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname || "";
+    const segments = (parsed.pathname || "")
+      .split("/")
+      .filter(Boolean)
+      .slice(0, 2)
+      .join(" ");
+    const combined = `${host} ${segments}`.trim();
+    if (!combined) return [];
+    return tokenize(combined).filter((token) => {
+      if (/^\d+$/.test(token)) return false;
+      if (/^[a-z0-9]+$/.test(token) && token.length <= 2) return false;
+      return true;
+    });
+  } catch (error) {
+    return [];
+  }
 }
 
 function setStatus(message) {
@@ -302,7 +323,9 @@ function tokenize(text) {
 }
 
 function getTitleTokens(meta) {
-  return tokenize(getTitleText(meta));
+  const titleTokens = tokenize(getTitleText(meta));
+  const urlTokens = getUrlTokens(meta.tab?.url || "");
+  return titleTokens.concat(urlTokens);
 }
 
 function buildVector(tokens, idfMap) {
