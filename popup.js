@@ -24,7 +24,11 @@ const TOPIC_CLUSTER_CONFIG = {
   kNearest: 5,
   minSharedTokens: 2,
   minAverageSimilarityFloor: 0.08,
-  minAverageSimilarityScale: 0.75
+  minAverageSimilarityScale: 0.75,
+  titleKeywordLimit: 3,
+  titleIncludeScores: true,
+  debugLogGroups: true,
+  debugKeywordLimit: 6
 };
 const TOPIC_THRESHOLD_CONFIG = {
   high: 0.22,
@@ -224,11 +228,54 @@ function tokenize(text) {
   }
   cleaned = cleaned.replace(TOKEN_REGEX, " ");
   const raw = cleaned.split(" ").filter(Boolean);
-  const stopwords = new Set([
+  const stopwordsEnglish = [
     "a", "an", "and", "are", "as", "at", "be", "by", "for", "from",
     "has", "have", "how", "in", "is", "it", "its", "of", "on", "or",
     "that", "the", "this", "to", "was", "were", "what", "when", "where",
-    "who", "why", "with", "you", "your"
+    "who", "why", "with", "you", "your", "our", "we", "us", "they",
+    "their", "them", "there", "here", "about", "into", "over", "under"
+  ];
+  const stopwordsGerman = [
+    "der", "die", "das", "den", "dem", "des", "ein", "eine", "einer", "eines",
+    "einem", "einen", "und", "oder", "aber", "doch", "dass", "daß", "nicht",
+    "kein", "keine", "keiner", "keines", "keinem", "keinen", "im", "am", "an",
+    "auf", "aus", "bei", "mit", "nach", "von", "vor", "zu", "zum", "zur",
+    "über", "unter", "für", "ist", "sind", "war", "waren", "wie", "was",
+    "wer", "wo", "wann", "warum", "wieso", "welche", "welcher", "welches",
+    "mehr", "anzeige", "anzeigen", "sie", "ihr", "ihre", "ihren", "ihrem",
+    "ihres", "wir", "uns", "euch", "euer", "eure"
+  ];
+  const stopwordsDutch = [
+    "de", "het", "een", "en", "of", "maar", "dat", "die", "dit", "in", "is",
+    "op", "te", "van", "voor", "met", "zonder", "naar", "bij", "aan", "uit",
+    "ook", "niet", "wel", "we", "wij", "jij", "je", "u", "hun", "ze", "zij",
+    "ons", "onze", "jullie", "waar", "wanneer", "waarom"
+  ];
+  const stopwordsSpanish = [
+    "el", "la", "los", "las", "un", "una", "unos", "unas", "y", "o", "pero",
+    "de", "del", "al", "en", "para", "por", "con", "sin", "sobre", "entre",
+    "como", "que", "qué", "quien", "quién", "cuando", "cuándo", "donde",
+    "dónde", "porque", "porqué", "si", "sí", "no", "ya", "más", "muy"
+  ];
+  const stopwordsWeb = [
+    "https", "http", "www", "com", "net", "org", "html", "htm", "php", "asp",
+    "css", "js", "json", "xml", "svg", "png", "jpg", "jpeg", "gif", "webp",
+    "amp", "utm", "ref", "referrer", "source", "medium", "campaign",
+    "index", "home", "default", "login", "signin", "signup"
+  ];
+  const stopwordsCssJs = [
+    "div", "span", "class", "id", "style", "display", "flex", "block",
+    "inline", "grid", "webkit", "moz", "ms", "px", "em", "rem",
+    "font", "woff", "woff2", "ttf", "otf", "rgba", "rgb", "url",
+    "border", "margin", "padding", "center"
+  ];
+  const stopwords = new Set([
+    ...stopwordsEnglish,
+    ...stopwordsGerman,
+    ...stopwordsDutch,
+    ...stopwordsSpanish,
+    ...stopwordsWeb,
+    ...stopwordsCssJs
   ]);
   return raw.filter((token) => token.length > 1 && !stopwords.has(token));
 }
@@ -283,6 +330,19 @@ function mergeVectors(target, source) {
   for (const [key, value] of source.entries()) {
     target.set(key, (target.get(key) || 0) + value);
   }
+}
+
+function normalizeVector(vector) {
+  let norm = 0;
+  for (const value of vector.values()) {
+    norm += value * value;
+  }
+  if (norm === 0) return vector;
+  const scale = 1 / Math.sqrt(norm);
+  for (const [key, value] of vector.entries()) {
+    vector.set(key, value * scale);
+  }
+  return vector;
 }
 
 function getTabTimes() {
@@ -1091,7 +1151,7 @@ function titleCase(word) {
   return `${word[0].toUpperCase()}${word.slice(1)}`;
 }
 
-function pickTopKeywords(vectors, limit) {
+function pickTopKeywordEntries(vectors, limit) {
   const counts = new Map();
   for (const vector of vectors) {
     for (const [key, value] of vector.entries()) {
@@ -1102,16 +1162,33 @@ function pickTopKeywords(vectors, limit) {
     if (b[1] !== a[1]) return b[1] - a[1];
     return b[0].length - a[0].length;
   });
-  return sorted.slice(0, limit).map(([key]) => key);
+  return sorted.slice(0, limit);
 }
 
 function buildTopicLabel(vectors) {
-  const keywords = pickTopKeywords(vectors, 2)
-    .map((word) => titleCase(word))
+  const entries = pickTopKeywordEntries(
+    vectors,
+    TOPIC_CLUSTER_CONFIG.titleKeywordLimit
+  );
+  if (entries.length === 0) return "Topic";
+  const labels = entries
+    .map(([word, score]) => {
+      const token = titleCase(word);
+      if (!token) return "";
+      if (!TOPIC_CLUSTER_CONFIG.titleIncludeScores) return token;
+      return `${token}(${score.toFixed(2)})`;
+    })
     .filter(Boolean);
-  if (keywords.length === 0) return "Topic";
-  const joined = keywords.join(" ");
+  const joined = labels.join(" ");
   return abbreviateKeyword(joined);
+}
+
+function buildDebugKeywords(vectors) {
+  const entries = pickTopKeywordEntries(
+    vectors,
+    TOPIC_CLUSTER_CONFIG.debugKeywordLimit
+  );
+  return entries.map(([word, score]) => `${word}:${score.toFixed(2)}`);
 }
 
 function getTopicThreshold() {
@@ -1171,7 +1248,7 @@ async function groupByTopic() {
         mergeVectors(vector, contentVector);
       }
     }
-    return vector;
+    return normalizeVector(vector);
   }
 
   function clusterTabs(threshold, includeContent) {
@@ -1305,6 +1382,21 @@ async function groupByTopic() {
   if (!hasGroups) {
     thresholdUsed = TOPIC_THRESHOLD_CONFIG.fallback;
     clusters = clusterTabs(thresholdUsed, false);
+  }
+
+  if (TOPIC_CLUSTER_CONFIG.debugLogGroups) {
+    const debugRows = clusters
+      .filter((cluster) => cluster.tabs.length >= 2)
+      .map((cluster, index) => ({
+        group: index + 1,
+        size: cluster.tabs.length,
+        keywords: buildDebugKeywords(cluster.vectors)
+      }));
+    if (debugRows.length > 0) {
+      console.log("Topic groups (pre-create):", debugRows);
+    } else {
+      console.log("Topic groups (pre-create): none");
+    }
   }
 
   if (!clusters.some((cluster) => cluster.tabs.length >= 2)) {
