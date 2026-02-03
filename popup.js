@@ -20,6 +20,18 @@ const settings = {
   topicSensitivity: "medium",
   activateTabsForContent: false
 };
+const TOPIC_CLUSTER_CONFIG = {
+  kNearest: 5,
+  minSharedTokens: 2,
+  minAverageSimilarityFloor: 0.08,
+  minAverageSimilarityScale: 0.75
+};
+const TOPIC_THRESHOLD_CONFIG = {
+  high: 0.22,
+  medium: 0.16,
+  low: 0.1,
+  fallback: 0.08
+};
 
 const closeDuplicatesButton = document.getElementById("closeDuplicates");
 const sortAlphaButton = document.getElementById("sortAlpha");
@@ -1106,9 +1118,9 @@ function getTopicThreshold() {
   const value = topicSensitivitySelect
     ? topicSensitivitySelect.value
     : settings.topicSensitivity;
-  if (value === "high") return 0.22;
-  if (value === "low") return 0.1;
-  return 0.16;
+  if (value === "high") return TOPIC_THRESHOLD_CONFIG.high;
+  if (value === "low") return TOPIC_THRESHOLD_CONFIG.low;
+  return TOPIC_THRESHOLD_CONFIG.medium;
 }
 
 async function ungroupAllTabsInternal(shouldRefresh) {
@@ -1167,8 +1179,12 @@ async function groupByTopic() {
     const vectors = metas.map((meta) => buildVectorForTab(meta, includeContent));
     const tokenSets = metas.map((meta) => new Set(getTitleTokens(meta)));
     const parent = new Array(metas.length).fill(0).map((_, index) => index);
-    const kNearest = 5;
-    const minSharedTokens = 2;
+    const kNearest = TOPIC_CLUSTER_CONFIG.kNearest;
+    const minSharedTokens = TOPIC_CLUSTER_CONFIG.minSharedTokens;
+    const minAverageSimilarity = Math.max(
+      TOPIC_CLUSTER_CONFIG.minAverageSimilarityFloor,
+      threshold * TOPIC_CLUSTER_CONFIG.minAverageSimilarityScale
+    );
 
     function find(index) {
       let root = index;
@@ -1247,7 +1263,39 @@ async function groupByTopic() {
       cluster.vectors.push(vectors[i]);
     }
 
-    return Array.from(clustersByRoot.values());
+    function averageSimilarity(vectorsInCluster) {
+      if (vectorsInCluster.length < 2) return 1;
+      let sum = 0;
+      let count = 0;
+      for (let i = 0; i < vectorsInCluster.length; i += 1) {
+        for (let j = i + 1; j < vectorsInCluster.length; j += 1) {
+          sum += cosineSimilarity(vectorsInCluster[i], vectorsInCluster[j]);
+          count += 1;
+        }
+      }
+      return count ? sum / count : 0;
+    }
+
+    const clusters = [];
+    for (const cluster of clustersByRoot.values()) {
+      if (cluster.tabs.length < 2) {
+        clusters.push(cluster);
+        continue;
+      }
+      const avg = averageSimilarity(cluster.vectors);
+      if (avg >= minAverageSimilarity) {
+        clusters.push(cluster);
+        continue;
+      }
+      for (let i = 0; i < cluster.tabs.length; i += 1) {
+        clusters.push({
+          tabs: [cluster.tabs[i]],
+          vectors: [cluster.vectors[i]]
+        });
+      }
+    }
+
+    return clusters;
   }
 
   const canUseContent = contentStats.success > 0;
@@ -1255,7 +1303,7 @@ async function groupByTopic() {
   let clusters = clusterTabs(thresholdUsed, canUseContent);
   const hasGroups = clusters.some((cluster) => cluster.tabs.length >= 2);
   if (!hasGroups) {
-    thresholdUsed = 0.08;
+    thresholdUsed = TOPIC_THRESHOLD_CONFIG.fallback;
     clusters = clusterTabs(thresholdUsed, false);
   }
 
