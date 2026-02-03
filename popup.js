@@ -1165,7 +1165,10 @@ async function groupByTopic() {
   function clusterTabs(threshold, includeContent) {
     const metas = safeTabsWithMeta;
     const vectors = metas.map((meta) => buildVectorForTab(meta, includeContent));
+    const tokenSets = metas.map((meta) => new Set(getTitleTokens(meta)));
     const parent = new Array(metas.length).fill(0).map((_, index) => index);
+    const kNearest = 5;
+    const minSharedTokens = 2;
 
     function find(index) {
       let root = index;
@@ -1185,10 +1188,48 @@ async function groupByTopic() {
       parent[rootB] = rootA;
     }
 
+    function countSharedTokens(a, b) {
+      const setA = tokenSets[a];
+      const setB = tokenSets[b];
+      if (setA.size === 0 || setB.size === 0) return 0;
+      const [small, large] =
+        setA.size <= setB.size ? [setA, setB] : [setB, setA];
+      let count = 0;
+      for (const token of small) {
+        if (large.has(token)) {
+          count += 1;
+          if (count >= minSharedTokens) return count;
+        }
+      }
+      return count;
+    }
+
+    const neighbors = new Array(metas.length)
+      .fill(0)
+      .map(() => []);
+
     for (let i = 0; i < metas.length; i += 1) {
       for (let j = i + 1; j < metas.length; j += 1) {
         const score = cosineSimilarity(vectors[i], vectors[j]);
-        if (score >= threshold) {
+        if (score < threshold) continue;
+        const sharedTokens = countSharedTokens(i, j);
+        if (sharedTokens < minSharedTokens) continue;
+        neighbors[i].push({ index: j, score });
+        neighbors[j].push({ index: i, score });
+      }
+    }
+
+    const topNeighbors = neighbors.map((list) => {
+      return list
+        .sort((a, b) => b.score - a.score)
+        .slice(0, kNearest)
+        .map((entry) => entry.index);
+    });
+
+    const topSets = topNeighbors.map((list) => new Set(list));
+    for (let i = 0; i < metas.length; i += 1) {
+      for (const j of topNeighbors[i]) {
+        if (topSets[j].has(i)) {
           union(i, j);
         }
       }
