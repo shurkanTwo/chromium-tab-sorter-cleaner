@@ -30,6 +30,7 @@ const TOPIC_CLUSTER_CONFIG = {
   adaptiveMinThreshold: 0.06,
   adaptiveMaxThreshold: 0.28,
   adaptiveMaxPairs: 2000,
+  useBigrams: true,
   titleKeywordLimit: 3,
   titleIncludeScores: true,
   debugLogGroups: true,
@@ -335,13 +336,42 @@ function tokenize(text) {
     ...stopwordsWeb,
     ...stopwordsCssJs
   ]);
-  return raw.filter((token) => token.length > 1 && !stopwords.has(token));
+  const stemmed = raw.map((token) => stemToken(token));
+  return stemmed.filter((token) => token.length > 1 && !stopwords.has(token));
+}
+
+function stemToken(token) {
+  if (!token) return "";
+  if (token.length <= 3) return token;
+  const suffixes = [
+    "ments", "ment", "tions", "tion", "ings", "ing", "ers", "er",
+    "ies", "ied", "ly", "ed", "es", "s"
+  ];
+  for (const suffix of suffixes) {
+    if (token.length > suffix.length + 2 && token.endsWith(suffix)) {
+      return token.slice(0, -suffix.length);
+    }
+  }
+  return token;
+}
+
+function addBigrams(tokens) {
+  if (!TOPIC_CLUSTER_CONFIG.useBigrams || tokens.length < 2) return tokens;
+  const result = [...tokens];
+  for (let i = 0; i < tokens.length - 1; i += 1) {
+    const left = tokens[i];
+    const right = tokens[i + 1];
+    if (!left || !right) continue;
+    result.push(`${left}_${right}`);
+  }
+  return result;
 }
 
 function getTitleTokens(meta) {
   const titleTokens = tokenize(getTitleText(meta));
   const urlTokens = getUrlTokens(meta.tab?.url || "");
-  return titleTokens.concat(urlTokens);
+  const withBigrams = addBigrams(titleTokens);
+  return withBigrams.concat(urlTokens);
 }
 
 function buildVector(tokens, idfMap) {
@@ -1345,7 +1375,7 @@ async function groupByTopic() {
       const content = contentByTabId.get(meta.tab.id) || "";
       if (content) {
         const contentVector = limitVector(
-          buildVector(tokenize(content), idfMap),
+          buildVector(addBigrams(tokenize(content)), idfMap),
           TOPIC_CLUSTER_CONFIG.contentTokenLimit
         );
         for (const [key, value] of contentVector.entries()) {
@@ -1362,7 +1392,9 @@ async function groupByTopic() {
     const vectors = metas.map((meta) =>
       buildVectorForTab(meta, includeContent, idfMap)
     );
-    const tokenSets = metas.map((meta) => new Set(getTitleTokens(meta)));
+    const titleTokenSets = metas.map((meta) =>
+      new Set(tokenize(getTitleText(meta)))
+    );
     const parent = new Array(metas.length).fill(0).map((_, index) => index);
     const kNearest = TOPIC_CLUSTER_CONFIG.kNearest;
     const minSharedTokens = TOPIC_CLUSTER_CONFIG.minSharedTokens;
@@ -1412,14 +1444,31 @@ async function groupByTopic() {
     }
 
     function countSharedTokens(a, b) {
-      const setA = tokenSets[a];
-      const setB = tokenSets[b];
+      const setA = titleTokenSets[a];
+      const setB = titleTokenSets[b];
       if (setA.size === 0 || setB.size === 0) return 0;
       const [small, large] =
         setA.size <= setB.size ? [setA, setB] : [setB, setA];
       let count = 0;
       for (const token of small) {
         if (large.has(token)) {
+          count += 1;
+          if (count >= minSharedTokens) return count;
+        }
+      }
+      return count;
+    }
+
+    function countSharedWeightedTokens(a, b) {
+      const vectorA = vectors[a];
+      const vectorB = vectors[b];
+      let count = 0;
+      for (const [token, value] of vectorA.entries()) {
+        if (value <= 0) continue;
+        const otherValue = vectorB.get(token);
+        if (otherValue == null || otherValue <= 0) continue;
+        const minValue = Math.min(value, otherValue);
+        if (minValue >= 0.05) {
           count += 1;
           if (count >= minSharedTokens) return count;
         }
@@ -1436,7 +1485,13 @@ async function groupByTopic() {
         const score = cosineSimilarity(vectors[i], vectors[j]);
         if (score < effectiveThreshold) continue;
         const sharedTokens = countSharedTokens(i, j);
-        if (sharedTokens < minSharedTokens) continue;
+        if (sharedTokens >= minSharedTokens) {
+          neighbors[i].push({ index: j, score });
+          neighbors[j].push({ index: i, score });
+          continue;
+        }
+        const sharedWeighted = countSharedWeightedTokens(i, j);
+        if (sharedWeighted < minSharedTokens) continue;
         neighbors[i].push({ index: j, score });
         neighbors[j].push({ index: i, score });
       }
@@ -1530,6 +1585,16 @@ async function groupByTopic() {
       console.log("Topic groups (pre-create):", debugRows);
     } else {
       console.log("Topic groups (pre-create): none");
+    }
+    const singletonRows = clusters
+      .filter((cluster) => cluster.tabs.length === 1)
+      .map((cluster) => ({
+        title: cluster.tabs[0]?.tab?.title || "(untitled)",
+        url: cluster.tabs[0]?.tab?.url || "",
+        keywords: buildDebugKeywords(cluster.vectors)
+      }));
+    if (singletonRows.length > 0) {
+      console.log("Topic singletons (pre-create):", singletonRows);
     }
   }
 
