@@ -28,7 +28,9 @@ const TOPIC_CLUSTER_CONFIG = {
   titleKeywordLimit: 3,
   titleIncludeScores: true,
   debugLogGroups: true,
-  debugKeywordLimit: 6
+  debugKeywordLimit: 6,
+  contentWeight: 0.3,
+  contentTokenLimit: 30
 };
 const TOPIC_THRESHOLD_CONFIG = {
   high: 0.22,
@@ -282,7 +284,16 @@ function tokenize(text) {
     "https", "http", "www", "com", "net", "org", "html", "htm", "php", "asp",
     "css", "js", "json", "xml", "svg", "png", "jpg", "jpeg", "gif", "webp",
     "amp", "utm", "ref", "referrer", "source", "medium", "campaign",
-    "index", "home", "default", "login", "signin", "signup"
+    "index", "home", "default", "login", "signin", "signup",
+    "account", "accounts", "user", "users", "profile", "profiles",
+    "settings", "setting", "preferences", "prefs", "dashboard", "admin",
+    "auth", "oauth", "callback", "redirect", "locale", "lang", "language",
+    "session", "sessions", "token", "tokens", "api", "v1", "v2", "v3",
+    "docs", "documentation", "help", "support", "faq", "terms", "privacy",
+    "policy", "cookie", "cookies", "consent", "about", "contact", "search",
+    "news", "blog", "articles", "article", "post", "posts", "tag", "tags",
+    "category", "categories", "page", "pages", "view", "views", "edit",
+    "new", "create", "update", "delete", "id", "ids", "detail", "details"
   ];
   const stopwordsCssJs = [
     "div", "span", "class", "id", "style", "display", "flex", "block",
@@ -1330,8 +1341,11 @@ async function groupByTopic() {
       if (content) {
         const contentVector = limitVector(
           buildVector(tokenize(content), idfMap),
-          40
+          TOPIC_CLUSTER_CONFIG.contentTokenLimit
         );
+        for (const [key, value] of contentVector.entries()) {
+          contentVector.set(key, value * TOPIC_CLUSTER_CONFIG.contentWeight);
+        }
         mergeVectors(vector, contentVector);
       }
     }
