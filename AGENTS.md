@@ -1,2 +1,3 @@
 - when asked to commit changes. Commit the changes with a commit message that fits the changes.
 - only commmit the changes that were made in this agent thread
+- never do git revert without asking for approval first.
