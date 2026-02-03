@@ -267,7 +267,28 @@ function tokenize(text) {
     "div", "span", "class", "id", "style", "display", "flex", "block",
     "inline", "grid", "webkit", "moz", "ms", "px", "em", "rem",
     "font", "woff", "woff2", "ttf", "otf", "rgba", "rgb", "url",
-    "border", "margin", "padding", "center"
+    "border", "margin", "padding", "center", "box", "banner", "justify",
+    "sans", "none", "trustarc", "align", "justify-content", "text",
+    "color", "background", "width", "height", "max", "min", "auto",
+    "left", "right", "top", "bottom", "relative", "absolute", "fixed",
+    "sticky", "position", "overflow", "hidden", "visible", "opacity",
+    "border-radius", "box-shadow", "z-index", "line-height", "font-family",
+    "font-size", "font-weight", "letter-spacing", "text-align", "uppercase",
+    "lowercase", "capitalize", "transform", "translate", "scale", "rotate",
+    "transition", "animation", "keyframes", "ease", "linear", "hover",
+    "active", "focus", "before", "after", "content", "var", "calc",
+    "grid-template", "grid-area", "gap", "row", "column", "cols", "rows",
+    "padding-left", "padding-right", "padding-top", "padding-bottom",
+    "margin-left", "margin-right", "margin-top", "margin-bottom",
+    "border-top", "border-right", "border-bottom", "border-left",
+    "display-block", "display-inline", "display-flex", "display-grid",
+    "script", "scripts", "javascript", "typescript", "js", "ts",
+    "console", "window", "document", "event", "events", "target",
+    "handler", "click", "submit", "input", "change", "keydown", "keyup",
+    "mousemove", "mouseenter", "mouseleave", "scroll", "resize",
+    "function", "const", "let", "var", "return", "true", "false", "null",
+    "undefined", "async", "await", "promise", "then", "catch", "finally",
+    "json", "object", "array", "string", "number", "boolean", "prototype"
   ];
   const stopwords = new Set([
     ...stopwordsEnglish,
@@ -284,16 +305,22 @@ function getTitleTokens(meta) {
   return tokenize(getTitleText(meta));
 }
 
-function buildVector(tokens) {
+function buildVector(tokens, idfMap) {
   const map = new Map();
   for (const token of tokens) {
     map.set(token, (map.get(token) || 0) + 1);
   }
+  if (idfMap) {
+    for (const [key, value] of map.entries()) {
+      const idf = idfMap.get(key) || 1;
+      map.set(key, value * idf);
+    }
+  }
   return map;
 }
 
-function buildTitleVector(meta) {
-  const vector = buildVector(getTitleTokens(meta));
+function buildTitleVector(meta, idfMap) {
+  const vector = buildVector(getTitleTokens(meta), idfMap);
   for (const [key, value] of vector.entries()) {
     vector.set(key, value * 2);
   }
@@ -343,6 +370,32 @@ function normalizeVector(vector) {
     vector.set(key, value * scale);
   }
   return vector;
+}
+
+function buildIdfMap(tabsWithMeta, includeContent, contentByTabId) {
+  const docCounts = new Map();
+  const totalDocs = tabsWithMeta.length || 1;
+
+  for (const meta of tabsWithMeta) {
+    const tokens = new Set(getTitleTokens(meta));
+    if (includeContent) {
+      const content = contentByTabId.get(meta.tab.id) || "";
+      if (content) {
+        tokenize(content).forEach((token) => tokens.add(token));
+      }
+    }
+    for (const token of tokens) {
+      docCounts.set(token, (docCounts.get(token) || 0) + 1);
+    }
+  }
+
+  const idfMap = new Map();
+  for (const [token, df] of docCounts.entries()) {
+    const idf = Math.log((totalDocs + 1) / (df + 1)) + 1;
+    idfMap.set(token, idf);
+  }
+
+  return idfMap;
 }
 
 function getTabTimes() {
@@ -673,7 +726,15 @@ async function fetchTabContents(tabsWithMeta, maxLength = 6000) {
           document.querySelector("main, article, [role='main']") ||
           document.body ||
           document.documentElement;
-        const raw = primary ? primary.textContent || "" : "";
+        if (!primary) return "";
+        const clone = primary.cloneNode(true);
+        clone.querySelectorAll("script, style, noscript").forEach((node) =>
+          node.remove()
+        );
+        clone.querySelectorAll(
+          "[id*='cookie' i],[class*='cookie' i],[id*='consent' i],[class*='consent' i],[id*='banner' i],[class*='banner' i],[id*='gdpr' i],[class*='gdpr' i],[id*='privacy' i],[class*='privacy' i]"
+        ).forEach((node) => node.remove());
+        const raw = clone.textContent || "";
         return raw.slice(0, limit);
       },
       args: [maxLength],
@@ -1238,22 +1299,27 @@ async function groupByTopic() {
     contentStats = contentResult.stats;
   }
 
-  function buildVectorForTab(meta, includeContent) {
-    const vector = buildTitleVector(meta);
+  function buildVectorForTab(meta, includeContent, idfMap) {
+    const vector = buildTitleVector(meta, idfMap);
 
     if (includeContent) {
       const content = contentByTabId.get(meta.tab.id) || "";
       if (content) {
-        const contentVector = limitVector(buildVector(tokenize(content)), 40);
+        const contentVector = limitVector(
+          buildVector(tokenize(content), idfMap),
+          40
+        );
         mergeVectors(vector, contentVector);
       }
     }
     return normalizeVector(vector);
   }
 
-  function clusterTabs(threshold, includeContent) {
+  function clusterTabs(threshold, includeContent, idfMap) {
     const metas = safeTabsWithMeta;
-    const vectors = metas.map((meta) => buildVectorForTab(meta, includeContent));
+    const vectors = metas.map((meta) =>
+      buildVectorForTab(meta, includeContent, idfMap)
+    );
     const tokenSets = metas.map((meta) => new Set(getTitleTokens(meta)));
     const parent = new Array(metas.length).fill(0).map((_, index) => index);
     const kNearest = TOPIC_CLUSTER_CONFIG.kNearest;
@@ -1376,12 +1442,16 @@ async function groupByTopic() {
   }
 
   const canUseContent = contentStats.success > 0;
+  const idfTitle = buildIdfMap(safeTabsWithMeta, false, contentByTabId);
+  const idfContent = canUseContent
+    ? buildIdfMap(safeTabsWithMeta, true, contentByTabId)
+    : idfTitle;
   let thresholdUsed = getTopicThreshold();
-  let clusters = clusterTabs(thresholdUsed, canUseContent);
+  let clusters = clusterTabs(thresholdUsed, canUseContent, idfContent);
   const hasGroups = clusters.some((cluster) => cluster.tabs.length >= 2);
   if (!hasGroups) {
     thresholdUsed = TOPIC_THRESHOLD_CONFIG.fallback;
-    clusters = clusterTabs(thresholdUsed, false);
+    clusters = clusterTabs(thresholdUsed, false, idfTitle);
   }
 
   if (TOPIC_CLUSTER_CONFIG.debugLogGroups) {
@@ -1423,7 +1493,7 @@ async function groupByTopic() {
       if (unassigned.length < 2) continue;
       unassigned.forEach((meta) => assigned.add(meta.tab.id));
       const vectors = unassigned.map((meta) =>
-        buildVector(getTitleTokens(meta))
+        buildVector(getTitleTokens(meta), idfTitle)
       );
       fallbackClusters.push({ tabs: unassigned, vectors, centroid: new Map() });
     }
