@@ -83,16 +83,16 @@ async function openActionWindow(sourceTab) {
   const targetWindowId = sourceTab?.windowId ?? null;
   const url = chrome.runtime.getURL(
     targetWindowId != null
-      ? `action_window.html?target=${targetWindowId}`
-      : "action_window.html"
+      ? `src/ui/action_window.html?target=${targetWindowId}`
+      : "src/ui/action_window.html"
   );
   const windows = await chrome.windows.getAll({ populate: true });
   const existing = windows.find((win) =>
-    win.tabs?.some((tab) => tab.url?.startsWith(chrome.runtime.getURL("action_window.html")))
+    win.tabs?.some((tab) => tab.url?.startsWith(chrome.runtime.getURL("src/ui/action_window.html")))
   );
   if (existing) {
     const tab = existing.tabs.find((t) =>
-      t.url?.startsWith(chrome.runtime.getURL("action_window.html"))
+      t.url?.startsWith(chrome.runtime.getURL("src/ui/action_window.html"))
     );
     if (tab && tab.url !== url) {
       await chrome.tabs.update(tab.id, { url });

@@ -15,7 +15,7 @@
     }
   },
   "background": {
-    "service_worker": "service_worker.js"
+    "service_worker": "src/background/service_worker.js"
   },
   "commands": {
     "_execute_action": {

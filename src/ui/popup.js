@@ -1,6 +1,6 @@
-import { settings } from "./config.js";
-import { elements, reportError } from "./ui.js";
-import { loadSettings, saveSettings } from "./settings.js";
+import { settings } from "../lib/config.js";
+import { elements, reportError } from "../lib/ui.js";
+import { loadSettings, saveSettings } from "../lib/settings.js";
 import {
   closeDuplicates,
   focusTargetWindow,
@@ -14,8 +14,8 @@ import {
   undoLastAction,
   ungroupAllTabs,
   updateTargetWindowLabel
-} from "./tabs.js";
-import { copyDebugReport, groupByTopic } from "./topic.js";
+} from "../lib/tabs.js";
+import { copyDebugReport, groupByTopic } from "../lib/topic.js";
 
 if (elements.closeDuplicatesButton) {
   elements.closeDuplicatesButton.addEventListener("click", () =>
