@@ -43,6 +43,34 @@ const STOPWORDS_SPANISH = [
   "como", "que", "qué", "quien", "quién", "cuando", "cuándo", "donde",
   "dónde", "porque", "porqué", "si", "sí", "no", "ya", "más", "muy"
 ];
+const STOPWORDS_FRENCH = [
+  "le", "la", "les", "un", "une", "des", "du", "de", "et", "ou", "mais",
+  "dans", "sur", "sous", "avec", "sans", "pour", "par", "chez", "entre",
+  "au", "aux", "ce", "cet", "cette", "ces", "son", "sa", "ses", "leur",
+  "leurs", "mon", "ma", "mes", "ton", "ta", "tes", "notre", "nos",
+  "votre", "vos", "qui", "que", "quoi", "dont", "ou", "quand",
+  "pourquoi", "comment", "est", "sont", "etre", "il", "elle",
+  "ils", "elles", "on", "nous", "vous", "je", "tu"
+];
+const STOPWORDS_ITALIAN = [
+  "il", "lo", "la", "i", "gli", "le", "un", "uno", "una", "e", "o", "ma",
+  "di", "del", "della", "dei", "degli", "delle", "da", "dal", "dalla",
+  "dai", "dagli", "dalle", "in", "nel", "nello", "nella", "nei", "negli",
+  "nelle", "su", "sul", "sullo", "sulla", "sui", "sugli", "sulle",
+  "per", "tra", "fra", "con", "senza", "che", "chi", "cui", "come",
+  "quando", "perche", "perchè", "dove", "qui", "ed",
+  "essere", "sono", "era", "erano", "io", "tu", "lui", "lei", "noi",
+  "voi", "loro", "mi", "ti", "si", "ci", "vi"
+];
+const STOPWORDS_PORTUGUESE = [
+  "o", "a", "os", "as", "um", "uma", "uns", "umas", "e", "ou", "mas",
+  "de", "do", "da", "dos", "das", "em", "no", "na", "nos", "nas",
+  "por", "para", "com", "sem", "sobre", "entre", "ao", "aos", "à",
+  "às", "que", "quem", "qual", "quais", "quando", "onde", "como",
+  "porque", "porquê", "se", "não", "sim", "já", "mais", "muito",
+  "ser", "são", "era", "eram", "eu", "tu", "ele", "ela", "nós",
+  "vos", "vós", "eles", "elas", "me", "te", "se", "nos", "vos"
+];
 const STOPWORDS_WEB = [
   "https", "http", "www", "com", "net", "org", "html", "htm", "php", "asp",
   "css", "js", "json", "xml", "svg", "png", "jpg", "jpeg", "gif", "webp",
@@ -91,6 +119,9 @@ const STOPWORDS = new Set([
   ...STOPWORDS_GERMAN,
   ...STOPWORDS_DUTCH,
   ...STOPWORDS_SPANISH,
+  ...STOPWORDS_FRENCH,
+  ...STOPWORDS_ITALIAN,
+  ...STOPWORDS_PORTUGUESE,
   ...STOPWORDS_WEB,
   ...STOPWORDS_CSS_JS
 ]);
