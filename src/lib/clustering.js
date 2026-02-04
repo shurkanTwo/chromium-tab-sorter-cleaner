@@ -131,6 +131,23 @@ const STOPWORDS_UI_META = [
   "toolbar", "menu", "footer", "header", "sidebar", "breadcrumb",
   "mail", "email", "newsletter", "share", "save", "learn", "more"
 ];
+const STOPWORDS_META_GENERIC = [
+  "apply", "applic", "application", "applications",
+  "activepost", "repost", "reposts",
+  "savelearn", "repostsavelearn", "agosavelearn", "agoicn",
+  "post", "posted", "posting", "repost",
+  "recruit", "recruiter", "recruiting",
+  "salary", "salaries", "comp", "compensation", "range", "estimate",
+  "benefit", "benefits",
+  "location", "locations",
+  "past",
+  "sponsor", "sponsored", "promoted", "promotions",
+  "premium", "upgrade",
+  "review", "reviews", "rating", "ratings",
+  "featured", "highly", "recommended", "trending",
+  "subscribe", "subscription",
+  "cookie", "consent", "privacy", "terms", "policy"
+];
 
 const STOPWORDS = new Set([
   ...STOPWORDS_ENGLISH,
@@ -142,6 +159,7 @@ const STOPWORDS = new Set([
   ...STOPWORDS_PORTUGUESE,
   ...STOPWORDS_TIME_META,
   ...STOPWORDS_UI_META,
+  ...STOPWORDS_META_GENERIC,
   ...STOPWORDS_WEB,
   ...STOPWORDS_CSS_JS
 ]);
@@ -315,6 +333,8 @@ export function buildVector(tokens, idfMap) {
   const map = new Map();
   for (const token of tokens) {
     const isNumericToken = /^\d+([.,]\d+)?$/.test(token);
+    const isAlphaNumericToken = /[a-z]/i.test(token) && /\d/.test(token);
+    if (isAlphaNumericToken) continue;
     if (isNumericToken && token.length <= 2) continue;
     const isTimeLikeToken =
       /\d{1,2}[_:.-]\d{1,2}/.test(token) ||
