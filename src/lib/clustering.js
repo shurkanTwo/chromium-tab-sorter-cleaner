@@ -170,7 +170,7 @@ export function addBigrams(tokens, useBigrams) {
 
 export function getTitleText(meta) {
   const title = meta.tab.title || "";
-  return title.trim();
+  return stripSiteNameFromTitle(title, meta.tab?.url || "");
 }
 
 export function getUrlTokens(url) {
@@ -193,6 +193,91 @@ export function getUrlTokens(url) {
   } catch (error) {
     return [];
   }
+}
+
+const TITLE_SEPARATORS = [
+  " - ",
+  " | ",
+  " — ",
+  " – ",
+  " · ",
+  " • ",
+  " :: ",
+  " » ",
+  " « "
+];
+
+const COMMON_TLDS = new Set([
+  "com", "net", "org", "co", "io", "gov", "edu", "dev", "app", "ai",
+  "uk", "de", "fr", "es", "it", "nl", "ru", "jp", "br", "ca", "au",
+  "us", "ch", "se", "no", "fi", "pl", "pt", "in", "kr", "cn"
+]);
+
+function escapeRegex(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function getHostTokens(url) {
+  if (!url) return [];
+  try {
+    const parsed = new URL(url);
+    const host = (parsed.hostname || "")
+      .toLowerCase()
+      .replace(/^www\d?\./, "");
+    if (!host) return [];
+    const labels = host
+      .split(".")
+      .filter(Boolean)
+      .filter((label) => !COMMON_TLDS.has(label));
+    if (labels.length === 0) return [];
+    const combined = labels
+      .map((label) => label.replace(/[^a-z0-9]+/g, " "))
+      .join(" ");
+    return tokenize(combined);
+  } catch (error) {
+    return [];
+  }
+}
+
+function shouldStripPart(part, hostTokens) {
+  if (!part) return false;
+  const tokens = tokenize(part);
+  if (tokens.length === 0 || hostTokens.length === 0) return false;
+  const hostSet = new Set(hostTokens);
+  let overlap = 0;
+  for (const token of tokens) {
+    if (hostSet.has(token)) {
+      overlap += 1;
+      if (overlap >= 1) return true;
+    }
+  }
+  const lower = part.toLowerCase();
+  return hostTokens.some((token) => token && lower.includes(token));
+}
+
+function stripSiteNameFromTitle(title, url) {
+  const trimmed = title.trim();
+  if (!trimmed) return "";
+  const hostTokens = getHostTokens(url);
+  if (hostTokens.length === 0) return trimmed;
+  const pattern = new RegExp(TITLE_SEPARATORS.map(escapeRegex).join("|"));
+  const parts = trimmed.split(pattern).map((part) => part.trim()).filter(Boolean);
+  if (parts.length < 2) return trimmed;
+
+  const first = parts[0];
+  const last = parts[parts.length - 1];
+
+  if (shouldStripPart(last, hostTokens)) {
+    const remaining = parts.slice(0, -1).join(" ").trim();
+    return remaining || trimmed;
+  }
+
+  if (shouldStripPart(first, hostTokens)) {
+    const remaining = parts.slice(1).join(" ").trim();
+    return remaining || trimmed;
+  }
+
+  return trimmed;
 }
 
 export function getTitleTokens(meta, useBigrams) {
