@@ -72,15 +72,20 @@ const STOPWORDS_PORTUGUESE = [
   "vos", "vós", "eles", "elas", "me", "te", "se", "nos", "vos"
 ];
 const STOPWORDS_WEB = [
-  "https", "http", "www", "com", "net", "org", "html", "htm", "php", "asp",
+  "https", "http", "www", "com", "net", "org", "html", "htm", "php", "asp", "aspx",
   "css", "js", "json", "xml", "svg", "png", "jpg", "jpeg", "gif", "webp",
   "amp", "utm", "ref", "referrer", "source", "medium", "campaign",
-  "index", "home", "default", "login", "signin", "signup",
+  "index", "home", "homepage", "default", "login", "signin", "signup",
+  "register", "logout",
   "account", "accounts", "user", "users", "profile", "profiles",
-  "settings", "setting", "preferences", "prefs", "dashboard", "admin",
+  "settings", "setting", "preferences", "prefs", "dashboard", "overview", "admin",
   "auth", "oauth", "callback", "redirect", "locale", "lang", "language",
-  "session", "sessions", "token", "tokens", "api", "v1", "v2", "v3",
+  "session", "sessions", "token", "tokens", "api", "sdk", "v1", "v2", "v3",
   "docs", "documentation", "help", "support", "faq", "terms", "privacy",
+  "example", "examples", "sample", "samples", "tutorial", "tutorials",
+  "install", "setup",
+  "pricing", "feature", "features", "solution", "solutions",
+  "customer", "customers", "enterprise",
   "policy", "cookie", "cookies", "consent", "about", "contact", "search",
   "news", "blog", "articles", "article", "post", "posts", "tag", "tags",
   "category", "categories", "page", "pages", "view", "views", "edit",
@@ -128,7 +133,7 @@ const STOPWORDS_TIME_META = [
   "recent", "recently", "within"
 ];
 const STOPWORDS_UI_META = [
-  "toolbar", "menu", "footer", "header", "sidebar", "breadcrumb",
+  "toolbar", "menu", "navigation", "footer", "header", "sidebar", "breadcrumb",
   "mail", "email", "newsletter", "share", "save", "learn", "more"
 ];
 const STOPWORDS_META_GENERIC = [
@@ -137,16 +142,23 @@ const STOPWORDS_META_GENERIC = [
   "savelearn", "repostsavelearn", "agosavelearn", "agoicn",
   "post", "posted", "posting", "repost",
   "recruit", "recruiter", "recruiting",
+  "accept", "reject", "sign",
   "salary", "salaries", "comp", "compensation", "range", "estimate",
   "benefit", "benefits",
   "location", "locations",
   "past",
   "sponsor", "sponsored", "promoted", "promotions",
   "premium", "upgrade",
-  "review", "reviews", "rating", "ratings",
+  "review", "reviews", "rating", "ratings", "guide", "tips",
+  "best", "top", "free", "online",
   "featured", "highly", "recommended", "trending",
   "subscribe", "subscription",
-  "cookie", "consent", "privacy", "terms", "policy"
+  "cookie", "consent", "privacy", "terms", "policy", "imprint",
+  "read", "see",
+  "youtube", "video", "watch",
+  "reddit", "thread", "comments",
+  "github", "issues", "pull", "commit",
+  "new_tab", "untitled"
 ];
 
 const STOPWORDS = new Set([
