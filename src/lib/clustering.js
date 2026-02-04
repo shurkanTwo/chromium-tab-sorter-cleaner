@@ -113,6 +113,24 @@ const STOPWORDS_CSS_JS = [
   "undefined", "async", "await", "promise", "then", "catch", "finally",
   "json", "object", "array", "string", "number", "boolean", "prototype"
 ];
+const STOPWORDS_TIME_META = [
+  "am", "pm", "gmt", "utc", "cet", "cest", "pst", "pdt", "est", "edt",
+  "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
+  "mon", "tue", "tues", "wed", "thu", "thur", "thurs", "fri", "sat", "sun",
+  "january", "february", "march", "april", "may", "june", "july", "august",
+  "september", "october", "november", "december",
+  "jan", "feb", "mar", "apr", "jun", "jul", "aug", "sep", "sept", "oct",
+  "nov", "dec",
+  "today", "yesterday", "tomorrow",
+  "minute", "minutes", "hour", "hours", "day", "days", "week", "weeks",
+  "month", "months", "year", "years",
+  "posted", "ago", "last", "updated", "update", "newest", "oldest",
+  "recent", "recently", "within"
+];
+const STOPWORDS_UI_META = [
+  "toolbar", "menu", "footer", "header", "sidebar", "breadcrumb",
+  "mail", "email", "newsletter", "share", "save", "learn", "more"
+];
 
 const STOPWORDS = new Set([
   ...STOPWORDS_ENGLISH,
@@ -122,6 +140,8 @@ const STOPWORDS = new Set([
   ...STOPWORDS_FRENCH,
   ...STOPWORDS_ITALIAN,
   ...STOPWORDS_PORTUGUESE,
+  ...STOPWORDS_TIME_META,
+  ...STOPWORDS_UI_META,
   ...STOPWORDS_WEB,
   ...STOPWORDS_CSS_JS
 ]);
@@ -295,6 +315,11 @@ export function buildVector(tokens, idfMap) {
   const map = new Map();
   for (const token of tokens) {
     const isNumericToken = /^\d+([.,]\d+)?$/.test(token);
+    if (isNumericToken && token.length <= 2) continue;
+    const isTimeLikeToken =
+      /\d{1,2}[_:.-]\d{1,2}/.test(token) ||
+      /^\d{4}([_-]\d{1,2}){0,2}$/.test(token);
+    if (isTimeLikeToken) continue;
     const weight = isNumericToken ? 0.35 : 1;
     map.set(token, (map.get(token) || 0) + weight);
   }

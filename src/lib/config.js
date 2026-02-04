@@ -25,7 +25,7 @@ export const CONFIG = {
     titleKeywordLimit: 3,
     titleIncludeScores: false,
     debugLogGroups: true,
-    debugKeywordLimit: 6,
+    debugKeywordLimit: 10,
     contentWeight: 0.6,
     contentTokenLimit: 60,
     urlTokenWeight: 0.35
