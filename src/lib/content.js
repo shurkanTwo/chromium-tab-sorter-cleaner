@@ -118,6 +118,9 @@ export async function fetchTabContents(tabsWithMeta, maxLength = 6000) {
           node.remove()
         );
         clone.querySelectorAll(
+          "header,footer,nav,aside,[role='navigation'],[role='contentinfo'],[aria-label*='breadcrumb' i]"
+        ).forEach((node) => node.remove());
+        clone.querySelectorAll(
           "[id*='cookie' i],[class*='cookie' i],[id*='consent' i],[class*='consent' i],[id*='banner' i],[class*='banner' i],[id*='gdpr' i],[class*='gdpr' i],[id*='privacy' i],[class*='privacy' i]"
         ).forEach((node) => node.remove());
         const raw = clone.textContent || "";

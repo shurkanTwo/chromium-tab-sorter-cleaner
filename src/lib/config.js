@@ -14,11 +14,11 @@ export const CONFIG = {
   topicCluster: {
     kNearest: 5,
     minSharedTokens: 1,
-    minAverageSimilarityFloor: 0.08,
+    minAverageSimilarityFloor: 0.06,
     minAverageSimilarityScale: 0.75,
     adaptiveThreshold: true,
-    adaptiveTargetSimilarity: 0.12,
-    adaptiveMinThreshold: 0.06,
+    adaptiveTargetSimilarity: 0.1,
+    adaptiveMinThreshold: 0.05,
     adaptiveMaxThreshold: 0.28,
     adaptiveMaxPairs: 2000,
     useBigrams: true,
@@ -26,14 +26,15 @@ export const CONFIG = {
     titleIncludeScores: false,
     debugLogGroups: true,
     debugKeywordLimit: 6,
-    contentWeight: 0.3,
-    contentTokenLimit: 30
+    contentWeight: 0.6,
+    contentTokenLimit: 60,
+    urlTokenWeight: 0.35
   },
   topicThresholds: {
-    high: 0.18,
-    medium: 0.12,
-    low: 0.08,
-    fallback: 0.06
+    high: 0.16,
+    medium: 0.1,
+    low: 0.07,
+    fallback: 0.05
   }
 };
 

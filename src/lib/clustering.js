@@ -294,7 +294,9 @@ export function getTitleOnlyTokens(meta) {
 export function buildVector(tokens, idfMap) {
   const map = new Map();
   for (const token of tokens) {
-    map.set(token, (map.get(token) || 0) + 1);
+    const isNumericToken = /^\d+([.,]\d+)?$/.test(token);
+    const weight = isNumericToken ? 0.35 : 1;
+    map.set(token, (map.get(token) || 0) + weight);
   }
   if (idfMap) {
     for (const [key, value] of map.entries()) {
@@ -305,8 +307,17 @@ export function buildVector(tokens, idfMap) {
   return map;
 }
 
-export function buildTitleVector(meta, idfMap, useBigrams) {
-  const vector = buildVector(getTitleTokens(meta, useBigrams), idfMap);
+export function buildTitleVector(meta, idfMap, useBigrams, urlTokenWeight = 0.35) {
+  const titleTokens = addBigrams(tokenize(getTitleText(meta)), useBigrams);
+  const urlTokens = getUrlTokens(meta.tab?.url || "");
+  const vector = buildVector(titleTokens, idfMap);
+  if (urlTokens.length > 0 && urlTokenWeight > 0) {
+    const urlVector = buildVector(urlTokens, idfMap);
+    for (const [key, value] of urlVector.entries()) {
+      urlVector.set(key, value * urlTokenWeight);
+    }
+    mergeVectors(vector, urlVector);
+  }
   for (const [key, value] of vector.entries()) {
     vector.set(key, value * 2);
   }

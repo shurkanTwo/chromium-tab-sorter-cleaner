@@ -47,7 +47,8 @@ function buildVectorForTab(meta, includeContent, idfMap, contentByTabId) {
   const vector = buildTitleVector(
     meta,
     idfMap,
-    CONFIG.topicCluster.useBigrams
+    CONFIG.topicCluster.useBigrams,
+    CONFIG.topicCluster.urlTokenWeight
   );
 
   if (includeContent) {
