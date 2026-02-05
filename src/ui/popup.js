@@ -1,5 +1,5 @@
 import { CONFIG, settings } from "../lib/config.js";
-import { elements, reportError } from "../lib/ui.js";
+import { elements, reportError, setStatus, setTopicGroupingRunning } from "../lib/ui.js";
 import { loadSettings, saveSettings } from "../lib/settings.js";
 import {
   closeDuplicates,
@@ -15,7 +15,21 @@ import {
   ungroupAllTabs,
   updateTargetWindowLabel
 } from "../lib/tabs.js";
-import { copyDebugReport, groupByTopic } from "../lib/topic.js";
+import {
+  copyDebugReport,
+  groupByTopic,
+  hasActiveTopicGrouping,
+  requestStopTopicGrouping
+} from "../lib/topic.js";
+
+async function runTopicGroupingWithStop() {
+  setTopicGroupingRunning(true);
+  try {
+    await runWithUndo(groupByTopic);
+  } finally {
+    setTopicGroupingRunning(hasActiveTopicGrouping());
+  }
+}
 
 if (elements.closeDuplicatesButton) {
   elements.closeDuplicatesButton.addEventListener("click", () =>
@@ -39,8 +53,14 @@ if (elements.groupDomainButton) {
 }
 if (elements.groupTopicButton) {
   elements.groupTopicButton.addEventListener("click", () =>
-    runWithUndo(groupByTopic)
+    runTopicGroupingWithStop()
   );
+}
+if (elements.stopActionButton) {
+  elements.stopActionButton.addEventListener("click", () => {
+    if (!requestStopTopicGrouping()) return;
+    setStatus("Stopping topic grouping...");
+  });
 }
 if (elements.collapseGroupsButton) {
   elements.collapseGroupsButton.addEventListener("click", () =>
@@ -230,6 +250,7 @@ window.addEventListener("unhandledrejection", (event) => {
 
 Promise.all([loadSettings(), loadUndoStack()])
   .then(async () => {
+    setTopicGroupingRunning(hasActiveTopicGrouping());
     await refresh();
     await updateTargetWindowLabel();
   })

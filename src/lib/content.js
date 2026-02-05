@@ -1,6 +1,6 @@
 import { settings } from "./config.js";
 import { elements, setProgress } from "./ui.js";
-import { getToggleValue, sleep } from "./utils.js";
+import { createAbortError, getToggleValue, sleep } from "./utils.js";
 import { getActiveTabId, isValidTabMeta } from "./tabs.js";
 
 function isScriptableUrl(url) {
@@ -37,14 +37,14 @@ export async function ensureContentAccess() {
   }
 }
 
-export async function fetchTabContents(tabsWithMeta, maxLength = 6000) {
+export async function fetchTabContents(tabsWithMeta, maxLength = 6000, shouldStop) {
   const results = new Map();
   const stats = {
     eligible: 0,
     success: 0,
     restricted: 0
   };
-  const activateTabs = getToggleValue(
+  const warmTabsByActivation = getToggleValue(
     elements.activateTabsForContentToggle,
     settings.activateTabsForContent
   );
@@ -67,11 +67,19 @@ export async function fetchTabContents(tabsWithMeta, maxLength = 6000) {
     return { contentsByTabId: results, stats };
   }
 
+  function throwIfStopped() {
+    if (typeof shouldStop === "function" && shouldStop()) {
+      throw createAbortError();
+    }
+  }
+
   let index = 0;
+  let warmed = 0;
   let completed = 0;
-  const concurrency = activateTabs ? 1 : Math.min(4, eligibleTabs.length);
+  const concurrency = Math.min(4, eligibleTabs.length);
   const timeoutMs = 4000;
-  const originalActiveTabId = activateTabs ? await getActiveTabId() : null;
+  const warmupProgressShare = warmTabsByActivation ? 0.35 : 0;
+  const originalActiveTabId = warmTabsByActivation ? await getActiveTabId() : null;
 
   async function hasHostPermission(url) {
     if (!chrome.permissions?.contains) return null;
@@ -91,16 +99,30 @@ export async function fetchTabContents(tabsWithMeta, maxLength = 6000) {
   }
 
   async function runWithTimeout(promise, ms) {
-    let timer = null;
+    let timeoutTimer = null;
+    let stopTimer = null;
     try {
       return await Promise.race([
         Promise.resolve(promise),
         new Promise((resolve) => {
-          timer = setTimeout(() => resolve(null), ms);
+          timeoutTimer = setTimeout(() => resolve(null), ms);
+        }),
+        new Promise((resolve) => {
+          if (typeof shouldStop !== "function") return;
+          if (shouldStop()) {
+            resolve(null);
+            return;
+          }
+          stopTimer = setInterval(() => {
+            if (shouldStop()) {
+              resolve(null);
+            }
+          }, 50);
         })
       ]);
     } finally {
-      if (timer) clearTimeout(timer);
+      if (timeoutTimer) clearTimeout(timeoutTimer);
+      if (stopTimer) clearInterval(stopTimer);
     }
   }
 
@@ -181,6 +203,29 @@ export async function fetchTabContents(tabsWithMeta, maxLength = 6000) {
     await sleep(200);
   }
 
+  async function waitForTabReady(tabId, maxWaitMs = 1200) {
+    const start = Date.now();
+    while (Date.now() - start < maxWaitMs) {
+      throwIfStopped();
+      const tab = await getFreshTab(tabId);
+      if (!tab) return;
+      if (tab.discarded) return;
+      if (!tab.status || tab.status === "complete") return;
+      await sleep(100);
+    }
+  }
+
+  async function warmTab(tab) {
+    throwIfStopped();
+    await activateTab(tab.id);
+    await waitForTabReady(tab.id);
+    warmed += 1;
+    const progress = eligibleTabs.length
+      ? (warmed / eligibleTabs.length) * (warmupProgressShare * 100)
+      : 0;
+    setProgress(progress);
+  }
+
   async function getFreshTab(tabId) {
     try {
       return await chrome.tabs.get(tabId);
@@ -190,10 +235,7 @@ export async function fetchTabContents(tabsWithMeta, maxLength = 6000) {
   }
 
   async function scanTab(tab) {
-    if (activateTabs) {
-      await activateTab(tab.id);
-    }
-
+    throwIfStopped();
     const currentTab = (await getFreshTab(tab.id)) || tab;
     if (currentTab.discarded) return;
     if (currentTab.status && currentTab.status !== "complete") return;
@@ -213,6 +255,7 @@ export async function fetchTabContents(tabsWithMeta, maxLength = 6000) {
       }
       return;
     }
+    throwIfStopped();
     if (!injected) return;
     const text = injected?.[0]?.result || "";
     if (text.trim().length > 0) {
@@ -223,25 +266,36 @@ export async function fetchTabContents(tabsWithMeta, maxLength = 6000) {
 
   async function worker() {
     while (index < eligibleTabs.length) {
+      throwIfStopped();
       const tab = eligibleTabs[index];
       index += 1;
       await scanTab(tab);
       completed += 1;
       const progress = eligibleTabs.length
-        ? (completed / eligibleTabs.length) * 100
+        ? warmupProgressShare * 100 +
+          (completed / eligibleTabs.length) * ((1 - warmupProgressShare) * 100)
         : 0;
       setProgress(progress);
     }
   }
 
-  await Promise.all(Array.from({ length: concurrency }, () => worker()));
-  setProgress(100);
-  if (activateTabs && originalActiveTabId != null) {
-    try {
-      await chrome.tabs.update(originalActiveTabId, { active: true });
-    } catch (error) {
-      // Ignore focus restore errors.
+  try {
+    if (warmTabsByActivation) {
+      for (const tab of eligibleTabs) {
+        await warmTab(tab);
+      }
+    }
+
+    await Promise.all(Array.from({ length: concurrency }, () => worker()));
+    setProgress(100);
+    return { contentsByTabId: results, stats };
+  } finally {
+    if (warmTabsByActivation && originalActiveTabId != null) {
+      try {
+        await chrome.tabs.update(originalActiveTabId, { active: true });
+      } catch (error) {
+        // Ignore focus restore errors.
+      }
     }
   }
-  return { contentsByTabId: results, stats };
 }

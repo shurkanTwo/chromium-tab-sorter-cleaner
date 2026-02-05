@@ -127,6 +127,9 @@ body.window {
   position: absolute;
   top: 16px;
   right: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .actions button {
@@ -195,6 +198,26 @@ button:disabled {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+.stop {
+  background: linear-gradient(180deg, rgba(110, 34, 44, 0.95), rgba(82, 25, 33, 0.95));
+  color: #ffe9ec;
+  border-color: rgba(255, 126, 140, 0.58);
+}
+
+.stop-icon-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stop-icon-btn:hover {
+  border-color: rgba(255, 150, 161, 0.82);
 }
 
 .btn-icon {

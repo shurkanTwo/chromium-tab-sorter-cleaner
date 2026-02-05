@@ -10,6 +10,7 @@ export const elements = {
   sortLastVisitedButton: document.getElementById("sortLastVisited"),
   groupDomainButton: document.getElementById("groupDomain"),
   groupTopicButton: document.getElementById("groupTopic"),
+  stopActionButton: document.getElementById("stopAction"),
   collapseGroupsButton: document.getElementById("collapseGroups"),
   expandGroupsButton: document.getElementById("expandGroups"),
   ungroupAllButton: document.getElementById("ungroupAll"),
@@ -128,6 +129,15 @@ export function renderTabs(tabsWithMeta, onTabClick) {
 export function setUndoEnabled(enabled) {
   if (!elements.undoActionButton) return;
   elements.undoActionButton.disabled = !enabled;
+}
+
+export function setTopicGroupingRunning(running) {
+  if (elements.stopActionButton) {
+    elements.stopActionButton.disabled = !running;
+  }
+  if (elements.groupTopicButton) {
+    elements.groupTopicButton.disabled = Boolean(running);
+  }
 }
 
 export function setTargetWindowLabel(targetId) {
