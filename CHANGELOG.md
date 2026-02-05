@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 - Documentation refresh for README, privacy policy, and GitHub Pages copy.
+- Added `scripts/package-cws.sh` to produce a Chrome Web Store upload ZIP.
+- Added `store-assets/README.md` with required CWS listing asset specs and publish checklist.
 
 ## [0.1.0] - 2026-02-05
 - Initial Chromium extension release.

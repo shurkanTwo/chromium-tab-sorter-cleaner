@@ -57,6 +57,13 @@ Optional live sync while editing:
 
 The watcher uses `inotifywait` when available, otherwise a 1s polling fallback.
 
+## Package for Chrome Web Store
+
+1. Run `./scripts/package-cws.sh`.
+2. Upload the generated ZIP from `build/` to the Chrome Web Store dashboard.
+3. Use `CWS_LISTING.md` for listing text.
+4. Add listing images from `store-assets/` (see `store-assets/README.md`).
+
 ## Usage
 
 Click the toolbar button to open the action window and run actions.
