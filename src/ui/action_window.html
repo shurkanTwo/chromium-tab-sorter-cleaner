@@ -266,9 +266,20 @@
       </aside>
     </main>
     <section class="status-panel" aria-live="polite">
-      <div id="statusMessage" class="status-text" role="status"></div>
-      <div class="status-progress">
-        <div id="statusProgressBar" class="status-progress-bar"></div>
+      <div class="status-line">
+        <div id="statusMessage" class="status-text" role="status"></div>
+        <div class="status-duration" aria-label="Duration">
+          <svg class="status-duration-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 7v5l3 2" />
+            <circle cx="12" cy="12" r="8" />
+          </svg>
+          <span id="statusDurationValue">0s</span>
+        </div>
+      </div>
+      <div class="status-progress-row">
+        <div class="status-progress">
+          <div id="statusProgressBar" class="status-progress-bar"></div>
+        </div>
       </div>
     </section>
     <footer class="footer-disclaimer">

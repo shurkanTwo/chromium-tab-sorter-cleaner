@@ -4,6 +4,7 @@ export const elements = {
   detailsBody: document.getElementById("detailsBody"),
   statusMessage: document.getElementById("statusMessage"),
   statusProgressBar: document.getElementById("statusProgressBar"),
+  statusDurationValue: document.getElementById("statusDurationValue"),
   targetWindowLabel: document.getElementById("targetWindowLabel"),
   closeDuplicatesButton: document.getElementById("closeDuplicates"),
   sortAlphaButton: document.getElementById("sortAlpha"),
@@ -59,6 +60,12 @@ export function setProgress(percent) {
   const safeValue = Number.isFinite(percent) ? percent : 0;
   const clamped = Math.min(100, Math.max(0, safeValue));
   elements.statusProgressBar.style.width = `${clamped}%`;
+}
+
+export function setStatusDurationSeconds(seconds) {
+  if (!elements.statusDurationValue) return;
+  const safeValue = Number.isFinite(seconds) ? Math.max(0, Math.floor(seconds)) : 0;
+  elements.statusDurationValue.textContent = `${safeValue}s`;
 }
 
 export function reportError(context, error) {

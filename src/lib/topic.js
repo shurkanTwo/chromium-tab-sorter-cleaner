@@ -26,9 +26,9 @@ import {
 import {
   elements,
   formatCount,
-  formatDuration,
   reportError,
   setProgress,
+  setStatusDurationSeconds,
   setStatus
 } from "./ui.js";
 import { createAbortError, getToggleValue, isAbortError } from "./utils.js";
@@ -106,6 +106,10 @@ export async function groupByTopic() {
   activeTopicRun = runState;
   const startedAt = Date.now();
   const runNumber = topicGroupingRunCount + 1;
+  setStatusDurationSeconds(0);
+  const durationTimer = setInterval(() => {
+    setStatusDurationSeconds((Date.now() - startedAt) / 1000);
+  }, 1000);
   const activateTabs = getToggleValue(
     elements.activateTabsForContentToggle,
     settings.activateTabsForContent
@@ -292,10 +296,9 @@ export async function groupByTopic() {
         `Restricted: ${formatCount(contentStats.restricted, "tab", "tabs")}.`
       );
     }
-    statusParts.push(
-      `Run #${runNumber}. Duration: ${formatDuration(Date.now() - startedAt)}.`
-    );
+    statusParts.push(`Run #${runNumber}.`);
     topicGroupingRunCount = runNumber;
+    setStatusDurationSeconds((Date.now() - startedAt) / 1000);
     setStatus(statusParts.join(" "));
     setProgress(100);
     throwIfCancelled(runState);
@@ -343,14 +346,14 @@ export async function groupByTopic() {
     await refresh();
   } catch (error) {
     if (isAbortError(error)) {
-      setStatus(
-        `Topic grouping stopped (run #${runNumber}) after ${formatDuration(Date.now() - startedAt)}.`
-      );
+      setStatus(`Topic grouping stopped (run #${runNumber}).`);
+      setStatusDurationSeconds((Date.now() - startedAt) / 1000);
       setProgress(0);
       return;
     }
     throw error;
   } finally {
+    clearInterval(durationTimer);
     if (activeTopicRun === runState) {
       activeTopicRun = null;
     }

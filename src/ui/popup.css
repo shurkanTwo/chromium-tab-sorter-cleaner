@@ -313,6 +313,7 @@ button:disabled {
 }
 
 .status-text {
+  flex: 1 1 auto;
   min-height: 14px;
   font-size: 11px;
   color: #a9b6d8;
@@ -327,11 +328,46 @@ button:disabled {
   overflow: hidden;
 }
 
+.status-progress-row {
+  display: flex;
+  align-items: center;
+}
+
 .status-progress-bar {
   height: 100%;
   width: 0%;
   background: linear-gradient(90deg, var(--accent) 0%, var(--accent-2) 60%, var(--accent-3) 100%);
   transition: width 0.2s ease;
+}
+
+.status-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.status-duration {
+  flex: 0 0 auto;
+  min-width: 54px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  font-size: 11px;
+  color: #c3cde8;
+  font-weight: 700;
+}
+
+.status-duration-icon {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.9;
 }
 
 .content {

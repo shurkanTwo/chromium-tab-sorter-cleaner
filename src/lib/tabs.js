@@ -2,9 +2,9 @@ import { MAX_UNDO, UNDO_KEY, settings } from "./config.js";
 import {
   elements,
   formatCount,
-  formatDuration,
   renderTabs,
   reportError,
+  setStatusDurationSeconds,
   setStatus,
   setUndoEnabled,
   setTargetWindowLabel
@@ -437,11 +437,9 @@ export async function sortWithGroups(comparator, metaById) {
     }
   }
   const groupMap = new Map();
-  const topLevel = [];
 
   for (const tab of candidates) {
     if (tab.groupId === -1) {
-      topLevel.push(tab);
       continue;
     }
     const list = groupMap.get(tab.groupId) || [];
@@ -538,11 +536,7 @@ export async function sortAlphabetically() {
     const titleB = (b.tab.title || b.tab.url || "").toLowerCase();
     return titleA.localeCompare(titleB);
   };
-  const sorted = [...tabsWithMeta].sort((a, b) => {
-    const titleA = (a.tab.title || a.tab.url || "").toLowerCase();
-    const titleB = (b.tab.title || b.tab.url || "").toLowerCase();
-    return titleA.localeCompare(titleB);
-  });
+  const sorted = [...tabsWithMeta].sort(comparator);
 
   if (tabs.some((tab) => tab.groupId !== -1)) {
     await sortWithGroups(comparator, metaById);
@@ -593,107 +587,116 @@ function abbreviateDomain(hostname) {
 export async function groupByDomain() {
   const startedAt = Date.now();
   const runNumber = domainGroupingRunCount + 1;
-  const tabsWithMeta = await fetchTabsWithMeta();
-  const sorted = [...tabsWithMeta].sort((a, b) => {
-    const hostA = a.hostname.toLowerCase();
-    const hostB = b.hostname.toLowerCase();
-    if (hostA === hostB) {
-      const titleA = (a.tab.title || a.tab.url || "").toLowerCase();
-      const titleB = (b.tab.title || b.tab.url || "").toLowerCase();
-      return titleA.localeCompare(titleB);
-    }
-    return hostA.localeCompare(hostB);
-  });
-
-  await moveTabsInOrder(sorted);
-
-  const windowId = await getTargetWindowId();
-  const useNames = elements.nameGroupsToggle?.checked ?? false;
-  const color = elements.groupColorSelect?.value || "";
-  const collapseAfter = elements.collapseAfterGroupToggle?.checked ?? false;
-
-  let currentHost = null;
-  let currentGroupTabs = [];
-  const plannedGroups = [];
-  let groupsCreated = 0;
-  let groupedTabs = 0;
-
-  function finalizeGroup() {
-    if (currentGroupTabs.length === 0) {
-      currentGroupTabs = [];
-      return;
-    }
-    plannedGroups.push({
-      host: currentHost,
-      tabIds: [...currentGroupTabs]
+  setStatusDurationSeconds(0);
+  const durationTimer = setInterval(() => {
+    setStatusDurationSeconds((Date.now() - startedAt) / 1000);
+  }, 1000);
+  try {
+    const tabsWithMeta = await fetchTabsWithMeta();
+    const sorted = [...tabsWithMeta].sort((a, b) => {
+      const hostA = a.hostname.toLowerCase();
+      const hostB = b.hostname.toLowerCase();
+      if (hostA === hostB) {
+        const titleA = (a.tab.title || a.tab.url || "").toLowerCase();
+        const titleB = (b.tab.title || b.tab.url || "").toLowerCase();
+        return titleA.localeCompare(titleB);
+      }
+      return hostA.localeCompare(hostB);
     });
-    currentGroupTabs = [];
-  }
 
-  async function createGroup(plan) {
-    const groupId = await runIgnoringMissingTab(
-      chrome.tabs.group({
-        tabIds: plan.tabIds,
-        createProperties: { windowId }
-      }),
-      "tabs.group"
-    );
-    if (groupId == null) {
-      return;
+    await moveTabsInOrder(sorted);
+
+    const windowId = await getTargetWindowId();
+    const useNames = elements.nameGroupsToggle?.checked ?? false;
+    const color = elements.groupColorSelect?.value || "";
+    const collapseAfter = elements.collapseAfterGroupToggle?.checked ?? false;
+
+    let currentHost = null;
+    let currentGroupTabs = [];
+    const plannedGroups = [];
+    let groupsCreated = 0;
+    let groupedTabs = 0;
+
+    function finalizeGroup() {
+      if (currentGroupTabs.length === 0) {
+        currentGroupTabs = [];
+        return;
+      }
+      plannedGroups.push({
+        host: currentHost,
+        tabIds: [...currentGroupTabs]
+      });
+      currentGroupTabs = [];
     }
-    groupsCreated += 1;
-    groupedTabs += plan.tabIds.length;
-    const updatePayload = {};
-    if (useNames && plan.host) {
-      updatePayload.title = abbreviateDomain(plan.host);
+
+    async function createGroup(plan) {
+      const groupId = await runIgnoringMissingTab(
+        chrome.tabs.group({
+          tabIds: plan.tabIds,
+          createProperties: { windowId }
+        }),
+        "tabs.group"
+      );
+      if (groupId == null) {
+        return;
+      }
+      groupsCreated += 1;
+      groupedTabs += plan.tabIds.length;
+      const updatePayload = {};
+      if (useNames && plan.host) {
+        updatePayload.title = abbreviateDomain(plan.host);
+      }
+      if (color) updatePayload.color = color;
+      if (collapseAfter) updatePayload.collapsed = true;
+      if (Object.keys(updatePayload).length > 0) {
+        await runIgnoringMissingTab(
+          chrome.tabGroups.update(groupId, updatePayload),
+          "tabGroups.update"
+        );
+      }
     }
-    if (color) updatePayload.color = color;
-    if (collapseAfter) updatePayload.collapsed = true;
-    if (Object.keys(updatePayload).length > 0) {
-      await runIgnoringMissingTab(
-        chrome.tabGroups.update(groupId, updatePayload),
-        "tabGroups.update"
+
+    for (const meta of sorted) {
+      const host = meta.hostname;
+      if (!host) {
+        finalizeGroup();
+        currentHost = null;
+        continue;
+      }
+      if (currentHost === null) {
+        currentHost = host;
+      }
+      if (host !== currentHost) {
+        finalizeGroup();
+        currentHost = host;
+      }
+      currentGroupTabs.push(meta.tab.id);
+    }
+    finalizeGroup();
+
+    for (let index = plannedGroups.length - 1; index >= 0; index -= 1) {
+      await createGroup(plannedGroups[index]);
+    }
+
+    if (groupsCreated > 0) {
+      setStatus(
+        `Grouped ${formatCount(groupedTabs, "tab", "tabs")} into ${formatCount(
+          groupsCreated,
+          "group",
+          "groups"
+        )} by domain. Run #${runNumber}.`
+      );
+    } else {
+      setStatus(
+        `No domain groups created from ${formatCount(sorted.length, "tab", "tabs")}. Run #${runNumber}.`
       );
     }
+    domainGroupingRunCount = runNumber;
+    setStatusDurationSeconds((Date.now() - startedAt) / 1000);
+    await refresh();
+  } finally {
+    clearInterval(durationTimer);
   }
-
-  for (const meta of sorted) {
-    const host = meta.hostname;
-    if (!host) {
-      finalizeGroup();
-      currentHost = null;
-      continue;
-    }
-    if (currentHost === null) {
-      currentHost = host;
-    }
-    if (host !== currentHost) {
-      finalizeGroup();
-      currentHost = host;
-    }
-    currentGroupTabs.push(meta.tab.id);
-  }
-  finalizeGroup();
-
-  for (let index = plannedGroups.length - 1; index >= 0; index -= 1) {
-    await createGroup(plannedGroups[index]);
-  }
-
-  if (groupsCreated > 0) {
-    setStatus(
-      `Grouped ${formatCount(groupedTabs, "tab", "tabs")} into ${formatCount(
-        groupsCreated,
-        "group",
-        "groups"
-      )} by domain. Run #${runNumber}. Duration: ${formatDuration(Date.now() - startedAt)}.`
-    );
-  } else {
-    setStatus(
-      `No domain groups created from ${formatCount(sorted.length, "tab", "tabs")}. Run #${runNumber}. Duration: ${formatDuration(Date.now() - startedAt)}.`
-    );
-  }
-  domainGroupingRunCount = runNumber;
-  await refresh();
 }
 
 export async function setAllGroupsCollapsed(collapsed) {
