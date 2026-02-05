@@ -26,6 +26,7 @@ import {
 import {
   elements,
   formatCount,
+  formatDuration,
   reportError,
   setProgress,
   setStatus
@@ -34,6 +35,7 @@ import { createAbortError, getToggleValue, isAbortError } from "./utils.js";
 
 let latestDebugReport = null;
 let activeTopicRun = null;
+let topicGroupingRunCount = 0;
 
 export function hasActiveTopicGrouping() {
   return activeTopicRun != null;
@@ -102,6 +104,8 @@ export async function groupByTopic() {
   }
   const runState = { cancelled: false };
   activeTopicRun = runState;
+  const startedAt = Date.now();
+  const runNumber = topicGroupingRunCount + 1;
   const activateTabs = getToggleValue(
     elements.activateTabsForContentToggle,
     settings.activateTabsForContent
@@ -288,6 +292,10 @@ export async function groupByTopic() {
         `Restricted: ${formatCount(contentStats.restricted, "tab", "tabs")}.`
       );
     }
+    statusParts.push(
+      `Run #${runNumber}. Duration: ${formatDuration(Date.now() - startedAt)}.`
+    );
+    topicGroupingRunCount = runNumber;
     setStatus(statusParts.join(" "));
     setProgress(100);
     throwIfCancelled(runState);
@@ -335,7 +343,9 @@ export async function groupByTopic() {
     await refresh();
   } catch (error) {
     if (isAbortError(error)) {
-      setStatus("Topic grouping stopped.");
+      setStatus(
+        `Topic grouping stopped (run #${runNumber}) after ${formatDuration(Date.now() - startedAt)}.`
+      );
       setProgress(0);
       return;
     }

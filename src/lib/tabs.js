@@ -2,6 +2,7 @@ import { MAX_UNDO, UNDO_KEY, settings } from "./config.js";
 import {
   elements,
   formatCount,
+  formatDuration,
   renderTabs,
   reportError,
   setStatus,
@@ -16,6 +17,7 @@ const targetWindowIdParam = Number.parseInt(
 );
 const hasTargetWindowId = Number.isFinite(targetWindowIdParam);
 const undoStack = [];
+let domainGroupingRunCount = 0;
 
 function getUndoStorage() {
   if (chrome.storage && chrome.storage.session) return chrome.storage.session;
@@ -589,6 +591,8 @@ function abbreviateDomain(hostname) {
 }
 
 export async function groupByDomain() {
+  const startedAt = Date.now();
+  const runNumber = domainGroupingRunCount + 1;
   const tabsWithMeta = await fetchTabsWithMeta();
   const sorted = [...tabsWithMeta].sort((a, b) => {
     const hostA = a.hostname.toLowerCase();
@@ -681,13 +685,14 @@ export async function groupByDomain() {
         groupsCreated,
         "group",
         "groups"
-      )} by domain.`
+      )} by domain. Run #${runNumber}. Duration: ${formatDuration(Date.now() - startedAt)}.`
     );
   } else {
     setStatus(
-      `No domain groups created from ${formatCount(sorted.length, "tab", "tabs")}.`
+      `No domain groups created from ${formatCount(sorted.length, "tab", "tabs")}. Run #${runNumber}. Duration: ${formatDuration(Date.now() - startedAt)}.`
     );
   }
+  domainGroupingRunCount = runNumber;
   await refresh();
 }
 
