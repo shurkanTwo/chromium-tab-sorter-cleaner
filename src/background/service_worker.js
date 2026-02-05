@@ -34,6 +34,16 @@ function persistState() {
   });
 }
 
+let persistTimer = null;
+
+function schedulePersist(delayMs = 200) {
+  if (persistTimer != null) return;
+  persistTimer = setTimeout(() => {
+    persistTimer = null;
+    persistState();
+  }, delayMs);
+}
+
 function commitActiveTime() {
   if (state.activeTabId == null || state.lastActivatedAt == null) return;
   const delta = nowMs() - state.lastActivatedAt;
@@ -47,7 +57,7 @@ async function handleActivated(activeInfo) {
   state.activeTabId = activeInfo.tabId;
   state.activeWindowId = activeInfo.windowId;
   state.lastActivatedAt = nowMs();
-  await persistState();
+  schedulePersist();
 }
 
 async function handleWindowFocus(windowId) {
@@ -56,7 +66,7 @@ async function handleWindowFocus(windowId) {
     state.activeTabId = null;
     state.activeWindowId = null;
     state.lastActivatedAt = null;
-    await persistState();
+    schedulePersist();
     return;
   }
 
@@ -66,7 +76,7 @@ async function handleWindowFocus(windowId) {
   state.activeTabId = tab.id;
   state.activeWindowId = windowId;
   state.lastActivatedAt = nowMs();
-  await persistState();
+  schedulePersist();
 }
 
 async function handleRemoved(tabId) {
@@ -77,7 +87,7 @@ async function handleRemoved(tabId) {
     state.activeWindowId = null;
     state.lastActivatedAt = null;
   }
-  await persistState();
+  schedulePersist();
 }
 
 chrome.runtime.onInstalled.addListener(() => {
@@ -88,25 +98,26 @@ chrome.runtime.onStartup.addListener(() => {
   ensureStateLoaded();
 });
 
+chrome.runtime.onSuspend.addListener(() => {
+  commitActiveTime();
+  persistState();
+});
+
 async function openActionWindow(sourceTab) {
   const targetWindowId = sourceTab?.windowId ?? null;
+  const actionWindowPrefix = chrome.runtime.getURL("src/ui/action_window.html");
   const url = chrome.runtime.getURL(
     targetWindowId != null
       ? `src/ui/action_window.html?target=${targetWindowId}`
       : "src/ui/action_window.html"
   );
-  const windows = await chrome.windows.getAll({ populate: true });
-  const existing = windows.find((win) =>
-    win.tabs?.some((tab) => tab.url?.startsWith(chrome.runtime.getURL("src/ui/action_window.html")))
-  );
-  if (existing) {
-    const tab = existing.tabs.find((t) =>
-      t.url?.startsWith(chrome.runtime.getURL("src/ui/action_window.html"))
-    );
-    if (tab && tab.url !== url) {
-      await chrome.tabs.update(tab.id, { url });
+  const [existingTab] = await chrome.tabs.query({ url: `${actionWindowPrefix}*` });
+  if (existingTab) {
+    if (existingTab.url !== url) {
+      await chrome.tabs.update(existingTab.id, { url });
     }
-    await chrome.windows.update(existing.id, { focused: true });
+    await chrome.windows.update(existingTab.windowId, { focused: true });
+    await chrome.tabs.update(existingTab.id, { active: true });
     return;
   }
   const width = 840;
@@ -155,9 +166,8 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type === "getTabTimes") {
     commitActiveTime();
-    persistState().then(() => {
-      sendResponse({ timeByTabId: state.timeByTabId });
-    });
+    sendResponse({ timeByTabId: state.timeByTabId });
+    schedulePersist();
     return true;
   }
   return undefined;
