@@ -13,59 +13,161 @@
       <div class="actions">
         <button id="undoAction" class="undo" disabled>Undo last action</button>
         <button id="closeDuplicates">Close duplicates</button>
-        <button id="sortAlpha">Sort A-Z</button>
+        <button id="sortAlpha">Sort A–Z</button>
         <button id="sortLastVisited">Sort by last visited</button>
         <button id="groupDomain">Group by domain</button>
         <button id="groupTopic">Group by topic</button>
         <button id="collapseGroups">Collapse groups</button>
         <button id="expandGroups">Expand groups</button>
         <button id="ungroupAll">Ungroup all</button>
-        <button id="copyDebugReport">Copy debug report</button>
       </div>
-      <div class="group-options">
-        <label class="option">
-          <input type="checkbox" id="nameGroups" checked />
-          Name groups
-        </label>
-        <label class="option">
-          Group color
-          <select id="groupColor">
-            <option value="" selected>No color</option>
-            <option value="blue">Blue</option>
-            <option value="red">Red</option>
-            <option value="yellow">Yellow</option>
-            <option value="green">Green</option>
-            <option value="pink">Pink</option>
-            <option value="purple">Purple</option>
-            <option value="cyan">Cyan</option>
-            <option value="orange">Orange</option>
-            <option value="grey">Grey</option>
-          </select>
-        </label>
-        <label class="option">
-          <input type="checkbox" id="collapseAfterGroup" />
-          Collapse after grouping
-        </label>
-        <label class="option">
-          Topic sensitivity
-          <select id="topicSensitivity">
-            <option value="low">Low</option>
-            <option value="medium" selected>Medium</option>
-            <option value="high">High</option>
-          </select>
-        </label>
-        <label class="option">
-          <input type="checkbox" id="activateTabsForContent" />
-          Activate tabs for content scan
-        </label>
-        <label class="option">
-          Last visited order
-          <select id="lastVisitedOrder">
-            <option value="desc" selected>Newest first</option>
-            <option value="asc">Oldest first</option>
-          </select>
-        </label>
-      </div>
+      <details class="config-panel">
+        <summary>Configuration</summary>
+        <div class="config-grid">
+          <label class="config-field config-check">
+            <input type="checkbox" id="nameGroups" checked />
+            <span>Name groups</span>
+          </label>
+          <label class="config-field">
+            <span>Group color</span>
+            <select id="groupColor">
+              <option value="" selected>No color</option>
+              <option value="blue">Blue</option>
+              <option value="red">Red</option>
+              <option value="yellow">Yellow</option>
+              <option value="green">Green</option>
+              <option value="pink">Pink</option>
+              <option value="purple">Purple</option>
+              <option value="cyan">Cyan</option>
+              <option value="orange">Orange</option>
+              <option value="grey">Grey</option>
+            </select>
+          </label>
+          <label class="config-field config-check">
+            <input type="checkbox" id="collapseAfterGroup" />
+            <span>Collapse after grouping</span>
+          </label>
+          <label class="config-field config-check">
+            <input type="checkbox" id="includePinnedTabs" />
+            <span>Include pinned tabs in actions</span>
+          </label>
+          <label class="config-field">
+            <span>Topic sensitivity</span>
+            <select id="topicSensitivity">
+              <option value="low">Low</option>
+              <option value="medium" selected>Medium</option>
+              <option value="high">High</option>
+            </select>
+          </label>
+          <label class="config-field config-check">
+            <input type="checkbox" id="activateTabsForContent" />
+            <span>Activate tabs for content scan</span>
+          </label>
+          <label class="config-field">
+            <span>Last visited order</span>
+            <select id="lastVisitedOrder">
+              <option value="desc" selected>Newest first</option>
+              <option value="asc">Oldest first</option>
+            </select>
+          </label>
+          <label class="config-field">
+            <span>kNearest</span>
+            <input id="cfgKNearest" type="number" min="1" step="1" />
+          </label>
+          <label class="config-field">
+            <span>Min shared tokens</span>
+            <input id="cfgMinSharedTokens" type="number" min="1" step="1" />
+          </label>
+          <label class="config-field">
+            <span>Min avg similarity floor</span>
+            <input id="cfgMinAverageSimilarityFloor" type="number" min="0" max="1" step="0.01" />
+          </label>
+          <label class="config-field">
+            <span>Min avg similarity scale</span>
+            <input id="cfgMinAverageSimilarityScale" type="number" min="0" max="2" step="0.01" />
+          </label>
+          <label class="config-field config-check">
+            <input id="cfgAdaptiveThreshold" type="checkbox" />
+            <span>Adaptive threshold</span>
+          </label>
+          <label class="config-field">
+            <span>Adaptive target similarity</span>
+            <input id="cfgAdaptiveTargetSimilarity" type="number" min="0" max="1" step="0.01" />
+          </label>
+          <label class="config-field">
+            <span>Adaptive min threshold</span>
+            <input id="cfgAdaptiveMinThreshold" type="number" min="0" max="1" step="0.01" />
+          </label>
+          <label class="config-field">
+            <span>Adaptive max threshold</span>
+            <input id="cfgAdaptiveMaxThreshold" type="number" min="0" max="1" step="0.01" />
+          </label>
+          <label class="config-field">
+            <span>Adaptive max pairs</span>
+            <input id="cfgAdaptiveMaxPairs" type="number" min="1" step="1" />
+          </label>
+          <label class="config-field config-check">
+            <input id="cfgUseBigrams" type="checkbox" />
+            <span>Use bigrams</span>
+          </label>
+          <label class="config-field">
+            <span>Title keyword limit</span>
+            <input id="cfgTitleKeywordLimit" type="number" min="1" step="1" />
+          </label>
+          <label class="config-field config-check">
+            <input id="cfgTitleIncludeScores" type="checkbox" />
+            <span>Title include scores</span>
+          </label>
+          <label class="config-field config-check">
+            <input id="cfgDebugLogGroups" type="checkbox" />
+            <span>Debug log groups</span>
+          </label>
+          <label class="config-field">
+            <span>Debug keyword limit</span>
+            <input id="cfgDebugKeywordLimit" type="number" min="1" step="1" />
+          </label>
+          <label class="config-field">
+            <span>Content weight</span>
+            <input id="cfgContentWeight" type="number" min="0" max="1" step="0.01" />
+          </label>
+          <label class="config-field">
+            <span>Content token limit</span>
+            <input id="cfgContentTokenLimit" type="number" min="1" step="1" />
+          </label>
+          <label class="config-field">
+            <span>URL token weight</span>
+            <input id="cfgUrlTokenWeight" type="number" min="0" max="1" step="0.01" />
+          </label>
+          <label class="config-field config-check">
+            <input id="cfgDynamicStopwordsEnabled" type="checkbox" />
+            <span>Dynamic stopwords</span>
+          </label>
+          <label class="config-field">
+            <span>Dynamic stopwords min doc ratio</span>
+            <input id="cfgDynamicStopwordsMinDocRatio" type="number" min="0" max="1" step="0.01" />
+          </label>
+          <label class="config-field">
+            <span>Dynamic stopwords min docs</span>
+            <input id="cfgDynamicStopwordsMinDocs" type="number" min="1" step="1" />
+          </label>
+          <label class="config-field">
+            <span>Threshold high</span>
+            <input id="cfgThresholdHigh" type="number" min="0" max="1" step="0.01" />
+          </label>
+          <label class="config-field">
+            <span>Threshold medium</span>
+            <input id="cfgThresholdMedium" type="number" min="0" max="1" step="0.01" />
+          </label>
+          <label class="config-field">
+            <span>Threshold low</span>
+            <input id="cfgThresholdLow" type="number" min="0" max="1" step="0.01" />
+          </label>
+          <label class="config-field">
+            <span>Threshold fallback</span>
+            <input id="cfgThresholdFallback" type="number" min="0" max="1" step="0.01" />
+          </label>
+        </div>
+      </details>
     </header>
 
     <main class="content">
@@ -93,9 +195,12 @@
       <div>
         This extension is provided "as is" without warranty. Use at your own risk.
       </div>
-      <a class="privacy-link" href="https://shurkantwo.github.io/chromium-tab-sorter-cleaner/" target="_blank" rel="noreferrer">
-        Privacy page
-      </a>
+      <div class="footer-links">
+        <a class="privacy-link" id="copyDebugReportLink" href="#">Copy debug report</a>
+        <a class="privacy-link" href="https://shurkantwo.github.io/chromium-tab-sorter-cleaner/" target="_blank" rel="noreferrer">
+          Privacy page
+        </a>
+      </div>
     </footer>
 
     <script type="module" src="popup.js"></script>

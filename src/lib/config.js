@@ -7,6 +7,7 @@ export const CONFIG = {
     nameGroups: true,
     groupColor: "",
     collapseAfterGroup: false,
+    includePinnedTabs: false,
     lastVisitedOrder: "desc",
     topicSensitivity: "medium",
     activateTabsForContent: false

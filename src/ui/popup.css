@@ -107,13 +107,67 @@ button:disabled {
   border-color: var(--ink);
 }
 
-.group-options {
+.config-panel {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fffaf3;
+  padding: 6px 8px;
+}
+
+.config-panel summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.config-grid {
+  margin-top: 8px;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px 10px;
+  gap: 8px;
+  max-height: 210px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.config-field {
+  display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   font-size: 11px;
   color: var(--muted);
+  font-weight: 600;
+}
+
+.config-check {
+  justify-content: flex-start;
+}
+
+.config-field input[type="number"] {
+  width: 92px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 3px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink);
+  background: #ffffff;
+}
+
+.config-field select {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 3px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink);
+  background: #fffaf3;
+}
+
+.config-field input[type="checkbox"] {
+  margin: 0;
 }
 
 .status-panel {
@@ -147,27 +201,6 @@ button:disabled {
   transition: width 0.2s ease;
 }
 
-
-.option {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-weight: 600;
-}
-
-.option select {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 3px 6px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--ink);
-  background: #fffaf3;
-}
-
-.option input[type="checkbox"] {
-  margin: 0;
-}
 
 button:hover {
   transform: translateY(-1px);
@@ -299,6 +332,12 @@ button:active {
   gap: 10px;
 }
 
+.footer-links {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .privacy-link {
   color: var(--accent-dark);
   font-weight: 600;
@@ -336,7 +375,7 @@ button:active {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .group-options {
+  .config-grid {
     grid-template-columns: 1fr;
   }
 }

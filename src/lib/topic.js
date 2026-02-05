@@ -265,9 +265,15 @@ export async function groupByTopic() {
   const useNames = elements.nameGroupsToggle?.checked ?? false;
   const color = elements.groupColorSelect?.value || "";
   const collapseAfter = elements.collapseAfterGroupToggle?.checked ?? false;
+  const groupsToCreate = clusters
+    .filter((cluster) => cluster.tabs.length >= 2)
+    .sort((a, b) => {
+      const firstA = Math.min(...a.tabs.map((meta) => meta.tab.index));
+      const firstB = Math.min(...b.tabs.map((meta) => meta.tab.index));
+      return firstB - firstA;
+    });
 
-  for (const cluster of clusters) {
-    if (cluster.tabs.length < 2) continue;
+  for (const cluster of groupsToCreate) {
     const tabIds = cluster.tabs.map((meta) => meta.tab.id);
     const groupId = await runIgnoringMissingTab(
       chrome.tabs.group({

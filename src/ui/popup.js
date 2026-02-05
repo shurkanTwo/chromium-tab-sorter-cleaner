@@ -1,4 +1,4 @@
-import { settings } from "../lib/config.js";
+import { CONFIG, settings } from "../lib/config.js";
 import { elements, reportError } from "../lib/ui.js";
 import { loadSettings, saveSettings } from "../lib/settings.js";
 import {
@@ -60,8 +60,11 @@ if (elements.ungroupAllButton) {
 if (elements.undoActionButton) {
   elements.undoActionButton.addEventListener("click", undoLastAction);
 }
-if (elements.copyDebugReportButton) {
-  elements.copyDebugReportButton.addEventListener("click", copyDebugReport);
+if (elements.copyDebugReportLink) {
+  elements.copyDebugReportLink.addEventListener("click", (event) => {
+    event.preventDefault();
+    copyDebugReport();
+  });
 }
 
 if (elements.nameGroupsToggle) {
@@ -80,6 +83,13 @@ if (elements.collapseAfterGroupToggle) {
   elements.collapseAfterGroupToggle.addEventListener("change", () => {
     settings.collapseAfterGroup = elements.collapseAfterGroupToggle.checked;
     saveSettings();
+  });
+}
+if (elements.includePinnedTabsToggle) {
+  elements.includePinnedTabsToggle.addEventListener("change", async () => {
+    settings.includePinnedTabs = elements.includePinnedTabsToggle.checked;
+    await saveSettings();
+    await refresh();
   });
 }
 if (elements.lastVisitedOrderSelect) {
@@ -104,6 +114,111 @@ if (elements.activateTabsForContentToggle) {
 if (elements.targetWindowLabel) {
   elements.targetWindowLabel.addEventListener("click", focusTargetWindow);
 }
+
+function bindBooleanSetting(element, target, key, onChange) {
+  if (!element) return;
+  element.addEventListener("change", async () => {
+    target[key] = element.checked;
+    await saveSettings();
+    if (typeof onChange === "function") {
+      await onChange();
+    }
+  });
+}
+
+function bindNumberSetting(element, target, key, integer = false) {
+  if (!element) return;
+  element.addEventListener("change", async () => {
+    const parsed = integer
+      ? Number.parseInt(element.value, 10)
+      : Number.parseFloat(element.value);
+    if (!Number.isFinite(parsed)) {
+      element.value = String(target[key]);
+      return;
+    }
+    target[key] = parsed;
+    await saveSettings();
+  });
+}
+
+bindNumberSetting(elements.cfgKNearestInput, CONFIG.topicCluster, "kNearest", true);
+bindNumberSetting(
+  elements.cfgMinSharedTokensInput,
+  CONFIG.topicCluster,
+  "minSharedTokens",
+  true
+);
+bindNumberSetting(
+  elements.cfgMinAverageSimilarityFloorInput,
+  CONFIG.topicCluster,
+  "minAverageSimilarityFloor"
+);
+bindNumberSetting(
+  elements.cfgMinAverageSimilarityScaleInput,
+  CONFIG.topicCluster,
+  "minAverageSimilarityScale"
+);
+bindBooleanSetting(elements.cfgAdaptiveThresholdToggle, CONFIG.topicCluster, "adaptiveThreshold");
+bindNumberSetting(
+  elements.cfgAdaptiveTargetSimilarityInput,
+  CONFIG.topicCluster,
+  "adaptiveTargetSimilarity"
+);
+bindNumberSetting(
+  elements.cfgAdaptiveMinThresholdInput,
+  CONFIG.topicCluster,
+  "adaptiveMinThreshold"
+);
+bindNumberSetting(
+  elements.cfgAdaptiveMaxThresholdInput,
+  CONFIG.topicCluster,
+  "adaptiveMaxThreshold"
+);
+bindNumberSetting(elements.cfgAdaptiveMaxPairsInput, CONFIG.topicCluster, "adaptiveMaxPairs", true);
+bindBooleanSetting(elements.cfgUseBigramsToggle, CONFIG.topicCluster, "useBigrams");
+bindNumberSetting(
+  elements.cfgTitleKeywordLimitInput,
+  CONFIG.topicCluster,
+  "titleKeywordLimit",
+  true
+);
+bindBooleanSetting(elements.cfgTitleIncludeScoresToggle, CONFIG.topicCluster, "titleIncludeScores");
+bindBooleanSetting(elements.cfgDebugLogGroupsToggle, CONFIG.topicCluster, "debugLogGroups");
+bindNumberSetting(
+  elements.cfgDebugKeywordLimitInput,
+  CONFIG.topicCluster,
+  "debugKeywordLimit",
+  true
+);
+bindNumberSetting(elements.cfgContentWeightInput, CONFIG.topicCluster, "contentWeight");
+bindNumberSetting(
+  elements.cfgContentTokenLimitInput,
+  CONFIG.topicCluster,
+  "contentTokenLimit",
+  true
+);
+bindNumberSetting(elements.cfgUrlTokenWeightInput, CONFIG.topicCluster, "urlTokenWeight");
+bindBooleanSetting(
+  elements.cfgDynamicStopwordsEnabledToggle,
+  CONFIG.topicCluster,
+  "dynamicStopwordsEnabled"
+);
+bindNumberSetting(
+  elements.cfgDynamicStopwordsMinDocRatioInput,
+  CONFIG.topicCluster,
+  "dynamicStopwordsMinDocRatio"
+);
+bindNumberSetting(
+  elements.cfgDynamicStopwordsMinDocsInput,
+  CONFIG.topicCluster,
+  "dynamicStopwordsMinDocs",
+  true
+);
+
+bindNumberSetting(elements.cfgThresholdHighInput, CONFIG.topicThresholds, "high");
+bindNumberSetting(elements.cfgThresholdMediumInput, CONFIG.topicThresholds, "medium");
+bindNumberSetting(elements.cfgThresholdLowInput, CONFIG.topicThresholds, "low");
+bindNumberSetting(elements.cfgThresholdFallbackInput, CONFIG.topicThresholds, "fallback");
 
 window.addEventListener("error", (event) => {
   reportError("popup", event?.error || event?.message || "Unknown error");

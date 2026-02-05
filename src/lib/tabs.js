@@ -1,4 +1,4 @@
-import { MAX_UNDO, UNDO_KEY } from "./config.js";
+import { MAX_UNDO, UNDO_KEY, settings } from "./config.js";
 import {
   elements,
   formatCount,
@@ -122,8 +122,14 @@ export async function fetchTabsWithMeta() {
   const lastVisitedByUrl = await fetchLastVisitedBatch(
     tabs.map((tab) => tab.url)
   );
+  const includePinnedTabs = settings.includePinnedTabs === true;
   const withMeta = tabs
-    .filter((tab) => tab && Number.isFinite(tab.id) && !tab.pinned)
+    .filter(
+      (tab) =>
+        tab &&
+        Number.isFinite(tab.id) &&
+        (includePinnedTabs || !tab.pinned)
+    )
     .map((tab) => ({
       tab,
       lastVisited: lastVisitedByUrl.get(tab.url) || null,
@@ -299,7 +305,10 @@ function getTabTimes() {
 export async function closeDuplicates() {
   const windowId = await getTargetWindowId();
   const tabs = await chrome.tabs.query({ windowId });
-  const candidates = tabs.filter((tab) => tab && !tab.pinned);
+  const includePinnedTabs = settings.includePinnedTabs === true;
+  const candidates = tabs.filter(
+    (tab) => tab && (includePinnedTabs || !tab.pinned)
+  );
   const seen = new Map();
   const toClose = [];
 
@@ -334,13 +343,20 @@ export async function closeDuplicates() {
 }
 
 export async function moveTabsInOrder(sorted) {
-  const windowId = await getTargetWindowId();
-  const pinnedCount = (await chrome.tabs.query({
-    windowId,
-    pinned: true
-  })).length;
-  for (let index = 0; index < sorted.length; index += 1) {
-    const tab = sorted[index].tab;
+  const includePinnedTabs = settings.includePinnedTabs === true;
+  const pinned = includePinnedTabs
+    ? sorted.filter((meta) => meta?.tab?.pinned)
+    : [];
+  const unpinned = sorted.filter((meta) => meta?.tab && !meta.tab.pinned);
+
+  for (let index = 0; index < pinned.length; index += 1) {
+    const tab = pinned[index].tab;
+    await runIgnoringMissingTab(chrome.tabs.move(tab.id, { index }), "tabs.move");
+  }
+
+  const pinnedCount = includePinnedTabs ? pinned.length : 0;
+  for (let index = 0; index < unpinned.length; index += 1) {
+    const tab = unpinned[index].tab;
     await runIgnoringMissingTab(
       chrome.tabs.move(tab.id, { index: pinnedCount + index }),
       "tabs.move"
@@ -351,8 +367,23 @@ export async function moveTabsInOrder(sorted) {
 export async function sortWithGroups(comparator, metaById) {
   const windowId = await getTargetWindowId();
   const tabs = await chrome.tabs.query({ windowId });
+  const includePinnedTabs = settings.includePinnedTabs === true;
   const pinnedCount = tabs.filter((tab) => tab.pinned).length;
   const candidates = tabs.filter((tab) => !tab.pinned);
+
+  if (includePinnedTabs) {
+    const pinnedTabs = tabs.filter((tab) => tab.pinned);
+    const fallbackMeta = (tab) => ({ tab, lastVisited: 0, timeSpent: 0, hostname: "" });
+    const pinnedSorted = [...pinnedTabs].sort((a, b) =>
+      comparator(metaById.get(a.id) || fallbackMeta(a), metaById.get(b.id) || fallbackMeta(b))
+    );
+    for (let index = 0; index < pinnedSorted.length; index += 1) {
+      await runIgnoringMissingTab(
+        chrome.tabs.move(pinnedSorted[index].id, { index }),
+        "tabs.move"
+      );
+    }
+  }
   const groupMap = new Map();
   const topLevel = [];
 
@@ -529,30 +560,38 @@ export async function groupByDomain() {
 
   let currentHost = null;
   let currentGroupTabs = [];
+  const plannedGroups = [];
   let groupsCreated = 0;
   let groupedTabs = 0;
 
-  async function finalizeGroup() {
+  function finalizeGroup() {
     if (currentGroupTabs.length === 0) {
       currentGroupTabs = [];
       return;
     }
+    plannedGroups.push({
+      host: currentHost,
+      tabIds: [...currentGroupTabs]
+    });
+    currentGroupTabs = [];
+  }
+
+  async function createGroup(plan) {
     const groupId = await runIgnoringMissingTab(
       chrome.tabs.group({
-        tabIds: currentGroupTabs,
+        tabIds: plan.tabIds,
         createProperties: { windowId }
       }),
       "tabs.group"
     );
     if (groupId == null) {
-      currentGroupTabs = [];
       return;
     }
     groupsCreated += 1;
-    groupedTabs += currentGroupTabs.length;
+    groupedTabs += plan.tabIds.length;
     const updatePayload = {};
-    if (useNames && currentHost) {
-      updatePayload.title = abbreviateDomain(currentHost);
+    if (useNames && plan.host) {
+      updatePayload.title = abbreviateDomain(plan.host);
     }
     if (color) updatePayload.color = color;
     if (collapseAfter) updatePayload.collapsed = true;
@@ -562,13 +601,12 @@ export async function groupByDomain() {
         "tabGroups.update"
       );
     }
-    currentGroupTabs = [];
   }
 
   for (const meta of sorted) {
     const host = meta.hostname;
     if (!host) {
-      await finalizeGroup();
+      finalizeGroup();
       currentHost = null;
       continue;
     }
@@ -576,12 +614,16 @@ export async function groupByDomain() {
       currentHost = host;
     }
     if (host !== currentHost) {
-      await finalizeGroup();
+      finalizeGroup();
       currentHost = host;
     }
     currentGroupTabs.push(meta.tab.id);
   }
-  await finalizeGroup();
+  finalizeGroup();
+
+  for (let index = plannedGroups.length - 1; index >= 0; index -= 1) {
+    await createGroup(plannedGroups[index]);
+  }
 
   if (groupsCreated > 0) {
     setStatus(
@@ -622,8 +664,9 @@ export async function setAllGroupsCollapsed(collapsed) {
 export async function ungroupAllTabsInternal(shouldRefresh) {
   const windowId = await getTargetWindowId();
   const tabs = await chrome.tabs.query({ windowId });
+  const includePinnedTabs = settings.includePinnedTabs === true;
   const groupedTabs = tabs.filter(
-    (tab) => !tab.pinned && tab.groupId !== -1
+    (tab) => tab.groupId !== -1 && (includePinnedTabs || !tab.pinned)
   );
   if (groupedTabs.length === 0) return 0;
   await runIgnoringMissingTab(
