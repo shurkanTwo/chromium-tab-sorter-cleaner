@@ -84,7 +84,7 @@ async function saveUndoStack() {
   await storage.set({ [UNDO_KEY]: undoStack });
 }
 
-export async function fetchLastVisitedBatch(urls) {
+async function fetchLastVisitedByUrl(urls) {
   const unique = Array.from(new Set(urls.filter(Boolean)));
   const results = new Map();
   const entries = await Promise.all(
@@ -103,6 +103,38 @@ export async function fetchLastVisitedBatch(urls) {
   return results;
 }
 
+export async function fetchLastVisitedBatch(tabs) {
+  const byTabId = new Map();
+  const fallbackUrls = [];
+  const fallbackTabIdsByUrl = new Map();
+
+  for (const tab of tabs) {
+    if (!tab || !Number.isFinite(tab.id)) continue;
+    const lastAccessed = Number(tab.lastAccessed);
+    if (Number.isFinite(lastAccessed) && lastAccessed > 0) {
+      byTabId.set(tab.id, lastAccessed);
+      continue;
+    }
+    if (!tab.url) continue;
+    fallbackUrls.push(tab.url);
+    const list = fallbackTabIdsByUrl.get(tab.url) || [];
+    list.push(tab.id);
+    fallbackTabIdsByUrl.set(tab.url, list);
+  }
+
+  if (fallbackUrls.length > 0) {
+    const byUrl = await fetchLastVisitedByUrl(fallbackUrls);
+    for (const [url, tabIds] of fallbackTabIdsByUrl.entries()) {
+      const fallbackTs = byUrl.get(url) || null;
+      for (const tabId of tabIds) {
+        byTabId.set(tabId, fallbackTs);
+      }
+    }
+  }
+
+  return byTabId;
+}
+
 export function getHostname(url) {
   try {
     return new URL(url).hostname;
@@ -119,9 +151,7 @@ export async function fetchTabsWithMeta() {
   ]);
 
   const timeByTabId = timeData?.timeByTabId || {};
-  const lastVisitedByUrl = await fetchLastVisitedBatch(
-    tabs.map((tab) => tab.url)
-  );
+  const lastVisitedByTabId = await fetchLastVisitedBatch(tabs);
   const includePinnedTabs = settings.includePinnedTabs === true;
   const withMeta = tabs
     .filter(
@@ -132,7 +162,7 @@ export async function fetchTabsWithMeta() {
     )
     .map((tab) => ({
       tab,
-      lastVisited: lastVisitedByUrl.get(tab.url) || null,
+      lastVisited: lastVisitedByTabId.get(tab.id) || null,
       timeSpent: timeByTabId[tab.id] || 0,
       hostname: getHostname(tab.url)
     }));
@@ -227,13 +257,28 @@ async function restoreState(state) {
   for (const item of desiredEntries) {
     const groupId = item.entry.groupId;
     if (groupId === -1) continue;
-    const list = groupsByOldId.get(groupId) || [];
-    list.push(item.tabId);
-    groupsByOldId.set(groupId, list);
+    const plan = groupsByOldId.get(groupId) || {
+      tabIds: [],
+      startIndex: item.entry.index
+    };
+    plan.tabIds.push(item.tabId);
+    if (item.entry.index < plan.startIndex) {
+      plan.startIndex = item.entry.index;
+    }
+    groupsByOldId.set(groupId, plan);
   }
 
   const groupMetaById = new Map(state.groups.map((group) => [group.id, group]));
-  for (const [oldGroupId, tabIds] of groupsByOldId.entries()) {
+  const groupPlans = Array.from(groupsByOldId.entries())
+    .map(([oldGroupId, plan]) => ({
+      oldGroupId,
+      tabIds: plan.tabIds,
+      startIndex: plan.startIndex
+    }))
+    .sort((a, b) => a.startIndex - b.startIndex);
+
+  for (let i = groupPlans.length - 1; i >= 0; i -= 1) {
+    const { oldGroupId, tabIds, startIndex } = groupPlans[i];
     const newGroupId = await runIgnoringMissingTab(
       chrome.tabs.group({
         tabIds,
@@ -242,6 +287,11 @@ async function restoreState(state) {
       "tabs.group"
     );
     if (newGroupId == null) continue;
+    try {
+      await chrome.tabGroups.move(newGroupId, { index: startIndex });
+    } catch (error) {
+      reportError("tabGroups.move", error);
+    }
     const meta = groupMetaById.get(oldGroupId);
     if (meta) {
       const updatePayload = {};

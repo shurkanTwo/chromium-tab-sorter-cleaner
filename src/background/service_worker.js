@@ -19,6 +19,15 @@ function loadState() {
   });
 }
 
+let loadStatePromise = null;
+
+function ensureStateLoaded() {
+  if (!loadStatePromise) {
+    loadStatePromise = loadState();
+  }
+  return loadStatePromise;
+}
+
 function persistState() {
   return chrome.storage.local.set({
     [TRACKER_STORAGE_KEY]: state
@@ -72,11 +81,11 @@ async function handleRemoved(tabId) {
 }
 
 chrome.runtime.onInstalled.addListener(() => {
-  loadState();
+  ensureStateLoaded();
 });
 
 chrome.runtime.onStartup.addListener(() => {
-  loadState();
+  ensureStateLoaded();
 });
 
 async function openActionWindow(sourceTab) {
@@ -154,4 +163,4 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return undefined;
 });
 
-loadState();
+ensureStateLoaded();
