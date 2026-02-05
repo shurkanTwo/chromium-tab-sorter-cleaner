@@ -18,7 +18,9 @@
           aria-label="Undo"
           disabled
         >
-          <span class="undo-glyph" aria-hidden="true">↶</span>
+          <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 4a8 8 0 1 1-5.66 13.66l1.41-1.41A6 6 0 1 0 12 6H7.83l2.58 2.59L9 10 4 5l5-5 1.41 1.41L7.83 4H12z" />
+          </svg>
         </button>
       </div>
       <button class="target-window" id="targetWindowLabel" type="button"></button>
@@ -26,15 +28,22 @@
         <section class="action-zone">
           <div class="actions actions-left">
             <button id="closeDuplicates">
-              <span class="btn-emoji" aria-hidden="true">🧹</span>
+              <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M7 3h10a2 2 0 0 1 2 2v10h-2V5H7V3z" />
+                <path d="M5 7h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2zm2.7 3.3L10 12.6l2.3-2.3 1.4 1.4-2.3 2.3 2.3 2.3-1.4 1.4-2.3-2.3-2.3 2.3-1.4-1.4 2.3-2.3-2.3-2.3 1.4-1.4z" />
+              </svg>
               <span>Close duplicates</span>
             </button>
             <button id="sortAlpha">
-              <span class="btn-emoji" aria-hidden="true">🔤</span>
+              <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M6 3l4 5H7v13H5V8H2l4-5zm6 3h8v2h-8V6zm0 5h6v2h-6v-2zm0 5h4v2h-4v-2z" />
+              </svg>
               <span>Sort A–Z</span>
             </button>
             <button id="sortLastVisited">
-              <span class="btn-emoji" aria-hidden="true">🕒</span>
+              <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm1 5h-2v6l5 3 1-1.7-4-2.3V7z" />
+              </svg>
               <span>Sort by last visited</span>
             </button>
           </div>
@@ -42,23 +51,39 @@
         <section class="action-zone">
           <div class="actions actions-right">
             <button id="groupDomain">
-              <span class="btn-emoji" aria-hidden="true">🌐</span>
+              <svg class="btn-icon btn-icon-stroke" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M3 12h18" />
+                <path d="M12 3c3.2 2.8 3.2 15.2 0 18" />
+                <path d="M12 3c-3.2 2.8-3.2 15.2 0 18" />
+              </svg>
               <span>Group by domain</span>
             </button>
             <button id="groupTopic">
-              <span class="btn-emoji" aria-hidden="true">🧠</span>
+              <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M7 5a3 3 0 1 1 0 6 3 3 0 0 1 0-6zm10 0a3 3 0 1 1 0 6 3 3 0 0 1 0-6zM12 13a3 3 0 1 1 0 6 3 3 0 0 1 0-6z" />
+                <path d="M9.6 9.4l2.4 4.5 2.4-4.5 1.8 1-2.7 5.1h-3l-2.7-5.1 1.8-1z" />
+              </svg>
               <span>Group by topic</span>
             </button>
             <button id="collapseGroups">
-              <span class="btn-emoji" aria-hidden="true">📚</span>
+              <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 4h16a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm0 9h16a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2z" />
+                <path d="M8 16h8v2H8z" />
+              </svg>
               <span>Collapse groups</span>
             </button>
             <button id="expandGroups">
-              <span class="btn-emoji" aria-hidden="true">📂</span>
+              <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 4h16a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm0 9h16a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2z" />
+                <path d="M11 15h2v4h-2zM9 17h6v2H9z" />
+              </svg>
               <span>Expand groups</span>
             </button>
             <button id="ungroupAll">
-              <span class="btn-emoji" aria-hidden="true">🧩</span>
+              <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M3 3h7v7H3V3zm11 0h7v7h-7V3zM3 14h7v7H3v-7zm11 0h7v7h-7v-7z" />
+              </svg>
               <span>Ungroup all</span>
             </button>
           </div>
