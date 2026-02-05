@@ -10,15 +10,23 @@ Tested working in Brave browser as well: [brave.com](https://brave.com)
 
 ## Features
 
-- Dedicated action window with status/progress output.
-- Targets the window it was opened from (click to focus the target window).
-- Sort tabs A-Z by title or by last visited order.
+- Dedicated action window (single instance) with status, duration, and progress.
+- Opens from the toolbar button or keyboard shortcut `Alt+Shift+T`.
+- Targets the window it was opened from (click target label to focus that window).
+- Sort tabs A-Z by title or by last-visited order.
 - Close duplicate tabs quickly.
-- Group tabs by domain or by topic (using page text when available).
+- Group tabs by domain.
+- Group tabs by topic using title/URL signals and optional page-content scanning.
+- Stop a running topic-grouping operation.
 - Collapse/expand all tab groups and ungroup everything.
-- Undo the last action.
-- Optionally activate tabs during scans to capture page text reliably.
-- Pinned tabs are excluded from actions and grouping.
+- Undo the last 5 actions.
+- Review tab details (URL, hostname, last visited, tracked time spent) on hover.
+- Copy a topic-grouping debug report to the clipboard.
+- Configurable behavior:
+  - Include pinned tabs in actions (off by default).
+  - Group naming, color, and collapse-after-grouping behavior.
+  - Topic sensitivity and advanced topic-clustering parameters.
+  - Optional "activate tabs for content scan" mode.
 
 ## Permissions
 
@@ -27,7 +35,7 @@ Tested working in Brave browser as well: [brave.com](https://brave.com)
 - `storage`: persist settings.
 - `tabGroups`: organize tabs into groups.
 - `scripting`: read visible page text for topic grouping.
-- Host access: optional, requested at runtime for page text scanning.
+- Host access (`<all_urls>`): optional, requested at runtime for topic page-text scanning.
 
 ## Install (unpacked)
 
@@ -47,11 +55,13 @@ Optional live sync while editing:
 1. Run `./scripts/watch-unpacked.sh`.
 2. Keep Brave loaded from `dist/` and use Reload after edits.
 
+The watcher uses `inotifywait` when available, otherwise a 1s polling fallback.
+
 ## Usage
 
 Click the toolbar button to open the action window and run actions.
 The window targets the browser window it was opened from; click the target
-label to focus it.
+label to focus it. You can also open the window via `Alt+Shift+T`.
 
 ## Troubleshooting (Brave content grouping)
 
@@ -60,7 +70,12 @@ label to focus it.
 - Discarded or not-fully-loaded tabs are skipped for content scans.
 - File URLs require "Allow access to file URLs" in extension details.
 - If content scans still time out, enable "Activate tabs for content scan".
-- Pinned tabs are excluded from actions and grouping.
+- If "Include pinned tabs in actions" is off, pinned tabs are excluded.
+
+## Privacy
+
+See [PRIVACY.md](PRIVACY.md) or the published page:
+https://shurkantwo.github.io/chromium-tab-sorter-cleaner/
 
 ## Disclaimer
 

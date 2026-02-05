@@ -50,30 +50,55 @@
         color: #6b6762;
         margin-top: 0;
       }
+
+      .links {
+        margin-top: 24px;
+      }
+
+      .links a {
+        color: #004f8a;
+      }
     </style>
   </head>
   <body>
     <main>
       <h1>Privacy Policy</h1>
-      <p class="meta">Last updated: 2026-02-01</p>
+      <p class="meta">Last updated: 2026-02-05</p>
 
       <p>
         Tab Sorter Cleaner is a Chromium extension that helps you sort tabs,
-        close duplicates, group tabs by domain, and review recent activity.
+        close duplicates, group tabs by domain or topic, and review recent activity.
       </p>
 
       <h2>Data We Access</h2>
       <ul>
         <li><strong>Tabs</strong>: Read tab titles and URLs to sort and deduplicate tabs.</li>
+        <li><strong>Page Content</strong>: Read visible page text to improve topic grouping.</li>
         <li><strong>History</strong>: Read visit times for open tabs to show "last visited."</li>
-        <li><strong>Storage</strong>: Store tab time tracking data locally on your device.</li>
+        <li>
+          <strong>Storage</strong>: Store settings, undo snapshots, and tab time tracking data
+          locally on your device.
+        </li>
         <li><strong>Tab Groups</strong>: Create and manage groups in the current window.</li>
+        <li>
+          <strong>Optional Host Permissions (<code>&lt;all_urls&gt;</code>)</strong>:
+          Requested at runtime only for page-content scans.
+        </li>
       </ul>
 
       <h2>How We Use Data</h2>
       <ul>
-        <li>All data is used only to provide the extension features inside your browser.</li>
-        <li>Tab time data is stored locally using Chrome's <code>storage.local</code> API.</li>
+        <li>All data is used only to provide extension features inside your browser.</li>
+        <li>
+          Page text is accessed locally at the time you run topic grouping. If enabled,
+          the extension may briefly activate tabs to capture visible text.
+        </li>
+        <li>
+          Runtime state and settings are stored in extension storage
+          (<code>storage.local</code>, and <code>storage.session</code> when available
+          for undo state).
+        </li>
+        <li>Clipboard write is used only when you click "Copy debug report."</li>
       </ul>
 
       <h2>Data Sharing</h2>
@@ -83,13 +108,33 @@
       </ul>
 
       <h2>Data Retention</h2>
+      <ul>
+        <li>
+          Tab time data remains in local storage until you remove the extension
+          or clear extension data.
+        </li>
+        <li>
+          Undo data remains in session storage when supported
+          (or local extension storage fallback).
+        </li>
+      </ul>
+
+      <h2>Copyright and License</h2>
       <p>
-        Tab time data remains in local storage until you remove the extension or
-        clear extension data.
+        Copyright (c) 2026 Lucas Lepski. All rights reserved.
+        Tab Sorter Cleaner is source-available and not open source.
       </p>
 
       <h2>Contact</h2>
-      <p>If you have questions, contact: Lucas Lepski</p>
+      <p>If you have questions, contact: Lucas Lepski (<code>lucas@lepski.de</code>)</p>
+
+      <p class="links">
+        <a href="https://github.com/shurkantwo/chromium-tab-sorter-cleaner/blob/main/README.md">README</a>
+        |
+        <a href="https://github.com/shurkantwo/chromium-tab-sorter-cleaner/blob/main/PRIVACY.md">PRIVACY.md</a>
+        |
+        <a href="https://github.com/shurkantwo/chromium-tab-sorter-cleaner/blob/main/LICENSE">LICENSE</a>
+      </p>
     </main>
   </body>
 </html>
