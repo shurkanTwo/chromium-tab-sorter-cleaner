@@ -40,7 +40,9 @@ function schedulePersist(delayMs = 200) {
   if (persistTimer != null) return;
   persistTimer = setTimeout(() => {
     persistTimer = null;
-    persistState();
+    persistState().catch((error) => {
+      console.error("Failed to persist tracker state:", error);
+    });
   }, delayMs);
 }
 
@@ -100,7 +102,9 @@ chrome.runtime.onStartup.addListener(() => {
 
 chrome.runtime.onSuspend.addListener(() => {
   commitActiveTime();
-  persistState();
+  persistState().catch((error) => {
+    console.error("Failed to persist tracker state on suspend:", error);
+  });
 });
 
 async function openActionWindow(sourceTab) {

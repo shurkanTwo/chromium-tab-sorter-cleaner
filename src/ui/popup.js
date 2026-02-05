@@ -87,50 +87,6 @@ if (elements.copyDebugReportLink) {
   });
 }
 
-if (elements.nameGroupsToggle) {
-  elements.nameGroupsToggle.addEventListener("change", () => {
-    settings.nameGroups = elements.nameGroupsToggle.checked;
-    saveSettings();
-  });
-}
-if (elements.groupColorSelect) {
-  elements.groupColorSelect.addEventListener("change", () => {
-    settings.groupColor = elements.groupColorSelect.value;
-    saveSettings();
-  });
-}
-if (elements.collapseAfterGroupToggle) {
-  elements.collapseAfterGroupToggle.addEventListener("change", () => {
-    settings.collapseAfterGroup = elements.collapseAfterGroupToggle.checked;
-    saveSettings();
-  });
-}
-if (elements.includePinnedTabsToggle) {
-  elements.includePinnedTabsToggle.addEventListener("change", async () => {
-    settings.includePinnedTabs = elements.includePinnedTabsToggle.checked;
-    await saveSettings();
-    await refresh();
-  });
-}
-if (elements.lastVisitedOrderSelect) {
-  elements.lastVisitedOrderSelect.addEventListener("change", () => {
-    settings.lastVisitedOrder = elements.lastVisitedOrderSelect.value;
-    saveSettings();
-  });
-}
-if (elements.topicSensitivitySelect) {
-  elements.topicSensitivitySelect.addEventListener("change", () => {
-    settings.topicSensitivity = elements.topicSensitivitySelect.value;
-    saveSettings();
-  });
-}
-if (elements.activateTabsForContentToggle) {
-  elements.activateTabsForContentToggle.addEventListener("change", () => {
-    settings.activateTabsForContent =
-      elements.activateTabsForContentToggle.checked;
-    saveSettings();
-  });
-}
 if (elements.targetWindowLabel) {
   elements.targetWindowLabel.addEventListener("click", focusTargetWindow);
 }
@@ -139,6 +95,17 @@ function bindBooleanSetting(element, target, key, onChange) {
   if (!element) return;
   element.addEventListener("change", async () => {
     target[key] = element.checked;
+    await saveSettings();
+    if (typeof onChange === "function") {
+      await onChange();
+    }
+  });
+}
+
+function bindSelectSetting(element, target, key, onChange) {
+  if (!element) return;
+  element.addEventListener("change", async () => {
+    target[key] = element.value;
     await saveSettings();
     if (typeof onChange === "function") {
       await onChange();
@@ -160,6 +127,23 @@ function bindNumberSetting(element, target, key, integer = false) {
     await saveSettings();
   });
 }
+
+bindBooleanSetting(elements.nameGroupsToggle, settings, "nameGroups");
+bindSelectSetting(elements.groupColorSelect, settings, "groupColor");
+bindBooleanSetting(elements.collapseAfterGroupToggle, settings, "collapseAfterGroup");
+bindBooleanSetting(
+  elements.includePinnedTabsToggle,
+  settings,
+  "includePinnedTabs",
+  refresh
+);
+bindSelectSetting(elements.lastVisitedOrderSelect, settings, "lastVisitedOrder");
+bindSelectSetting(elements.topicSensitivitySelect, settings, "topicSensitivity");
+bindBooleanSetting(
+  elements.activateTabsForContentToggle,
+  settings,
+  "activateTabsForContent"
+);
 
 bindNumberSetting(elements.cfgKNearestInput, CONFIG.topicCluster, "kNearest", true);
 bindNumberSetting(
