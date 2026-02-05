@@ -341,7 +341,7 @@ export function getTitleOnlyTokens(meta) {
   return tokenize(getTitleText(meta));
 }
 
-export function buildVector(tokens, idfMap) {
+export function buildVector(tokens, idfMap, dynamicStopwords) {
   const map = new Map();
   for (const token of tokens) {
     const isNumericToken = /^\d+([.,]\d+)?$/.test(token);
@@ -352,6 +352,7 @@ export function buildVector(tokens, idfMap) {
       /\d{1,2}[_:.-]\d{1,2}/.test(token) ||
       /^\d{4}([_-]\d{1,2}){0,2}$/.test(token);
     if (isTimeLikeToken) continue;
+    if (dynamicStopwords?.has(token)) continue;
     const weight = isNumericToken ? 0.35 : 1;
     map.set(token, (map.get(token) || 0) + weight);
   }
@@ -364,12 +365,18 @@ export function buildVector(tokens, idfMap) {
   return map;
 }
 
-export function buildTitleVector(meta, idfMap, useBigrams, urlTokenWeight = 0.35) {
+export function buildTitleVector(
+  meta,
+  idfMap,
+  useBigrams,
+  urlTokenWeight = 0.35,
+  dynamicStopwords
+) {
   const titleTokens = addBigrams(tokenize(getTitleText(meta)), useBigrams);
   const urlTokens = getUrlTokens(meta.tab?.url || "");
-  const vector = buildVector(titleTokens, idfMap);
+  const vector = buildVector(titleTokens, idfMap, dynamicStopwords);
   if (urlTokens.length > 0 && urlTokenWeight > 0) {
-    const urlVector = buildVector(urlTokens, idfMap);
+    const urlVector = buildVector(urlTokens, idfMap, dynamicStopwords);
     for (const [key, value] of urlVector.entries()) {
       urlVector.set(key, value * urlTokenWeight);
     }
@@ -430,7 +437,8 @@ export function buildIdfMap(
   tabsWithMeta,
   includeContent,
   contentByTabId,
-  useBigrams
+  useBigrams,
+  dynamicStopwordsConfig
 ) {
   const docCounts = new Map();
   const totalDocs = tabsWithMeta.length || 1;
@@ -456,7 +464,30 @@ export function buildIdfMap(
     idfMap.set(token, idf);
   }
 
-  return idfMap;
+  if (!dynamicStopwordsConfig?.enabled) {
+    return { idfMap, dynamicStopwords: new Set() };
+  }
+
+  const minRatio =
+    Number.isFinite(dynamicStopwordsConfig.minDocRatio) &&
+    dynamicStopwordsConfig.minDocRatio > 0
+      ? dynamicStopwordsConfig.minDocRatio
+      : 0.6;
+  const minDocs =
+    Number.isFinite(dynamicStopwordsConfig.minDocs) &&
+    dynamicStopwordsConfig.minDocs > 0
+      ? dynamicStopwordsConfig.minDocs
+      : 3;
+
+  const dynamicStopwords = new Set();
+  for (const [token, df] of docCounts.entries()) {
+    if (df < minDocs) continue;
+    if (df / totalDocs >= minRatio) {
+      dynamicStopwords.add(token);
+    }
+  }
+
+  return { idfMap, dynamicStopwords };
 }
 
 export function pickTopKeywordEntries(vectors, limit) {

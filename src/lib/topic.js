@@ -43,12 +43,19 @@ function getTopicThreshold() {
   return CONFIG.topicThresholds.medium;
 }
 
-function buildVectorForTab(meta, includeContent, idfMap, contentByTabId) {
+function buildVectorForTab(
+  meta,
+  includeContent,
+  idfMap,
+  contentByTabId,
+  dynamicStopwords
+) {
   const vector = buildTitleVector(
     meta,
-    idfMap,
+    idfMap.idfMap,
     CONFIG.topicCluster.useBigrams,
-    CONFIG.topicCluster.urlTokenWeight
+    CONFIG.topicCluster.urlTokenWeight,
+    dynamicStopwords
   );
 
   if (includeContent) {
@@ -57,7 +64,8 @@ function buildVectorForTab(meta, includeContent, idfMap, contentByTabId) {
       const contentVector = limitVector(
         buildVector(
           addBigrams(tokenize(content), CONFIG.topicCluster.useBigrams),
-          idfMap
+          idfMap.idfMap,
+          dynamicStopwords
         ),
         CONFIG.topicCluster.contentTokenLimit
       );
@@ -98,22 +106,41 @@ export async function groupByTopic() {
     safeTabsWithMeta,
     false,
     contentByTabId,
-    CONFIG.topicCluster.useBigrams
+    CONFIG.topicCluster.useBigrams,
+    {
+      enabled: CONFIG.topicCluster.dynamicStopwordsEnabled,
+      minDocRatio: CONFIG.topicCluster.dynamicStopwordsMinDocRatio,
+      minDocs: CONFIG.topicCluster.dynamicStopwordsMinDocs
+    }
   );
   const idfContent = canUseContent
     ? buildIdfMap(
         safeTabsWithMeta,
         true,
         contentByTabId,
-        CONFIG.topicCluster.useBigrams
+        CONFIG.topicCluster.useBigrams,
+        {
+          enabled: CONFIG.topicCluster.dynamicStopwordsEnabled,
+          minDocRatio: CONFIG.topicCluster.dynamicStopwordsMinDocRatio,
+          minDocs: CONFIG.topicCluster.dynamicStopwordsMinDocs
+        }
       )
     : idfTitle;
-  const titleOnlyTokenSets = safeTabsWithMeta.map(
-    (meta) => new Set(getTitleOnlyTokens(meta))
-  );
+  const titleOnlyTokenSets = safeTabsWithMeta.map((meta) => {
+    const tokens = getTitleOnlyTokens(meta).filter(
+      (token) => !idfTitle.dynamicStopwords.has(token)
+    );
+    return new Set(tokens);
+  });
   const buildClusters = (threshold, includeContent, idfMap) => {
     const vectors = safeTabsWithMeta.map((meta) =>
-      buildVectorForTab(meta, includeContent, idfMap, contentByTabId)
+      buildVectorForTab(
+        meta,
+        includeContent,
+        idfMap,
+        contentByTabId,
+        idfMap.dynamicStopwords
+      )
     );
     return clusterTabs({
       metas: safeTabsWithMeta,
@@ -187,7 +214,11 @@ export async function groupByTopic() {
       if (unassigned.length < 2) continue;
       unassigned.forEach((meta) => assigned.add(meta.tab.id));
       const vectors = unassigned.map((meta) =>
-        buildVector(getTitleTokens(meta, CONFIG.topicCluster.useBigrams), idfTitle)
+        buildVector(
+          getTitleTokens(meta, CONFIG.topicCluster.useBigrams),
+          idfTitle.idfMap,
+          idfTitle.dynamicStopwords
+        )
       );
       fallbackClusters.push({ tabs: unassigned, vectors, centroid: new Map() });
     }

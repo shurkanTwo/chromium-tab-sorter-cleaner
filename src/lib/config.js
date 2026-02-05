@@ -28,7 +28,10 @@ export const CONFIG = {
     debugKeywordLimit: 10,
     contentWeight: 0.6,
     contentTokenLimit: 60,
-    urlTokenWeight: 0.35
+    urlTokenWeight: 0.35,
+    dynamicStopwordsEnabled: true,
+    dynamicStopwordsMinDocRatio: 0.6,
+    dynamicStopwordsMinDocs: 3
   },
   topicThresholds: {
     high: 0.16,
