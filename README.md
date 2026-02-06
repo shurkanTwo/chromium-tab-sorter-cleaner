@@ -2,7 +2,7 @@
 
 ![Demo animation](docs/assets/demo.gif)
 
-[![Manage Tabs demo](https://img.youtube.com/vi/2SNyTUOQEM0/maxresdefault.jpg)](https://www.youtube.com/watch?v=2SNyTUOQEM0)
+Demo video: https://www.youtube.com/watch?v=2SNyTUOQEM0
 
 Chromium extension that helps you sort and group tabs, close duplicates, and
 review tab activity from a dedicated action window.
