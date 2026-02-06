@@ -14,6 +14,9 @@ All notable changes to this project will be documented in this file.
 - Extracted shared helper for tab-group update payload handling.
 - Tuned default topic-clustering thresholds and weights to reduce missed group merges.
 - Added a configuration button to reset all settings to defaults.
+- Improved clustering to keep strong one-way neighbor matches and prune outliers instead of splitting whole clusters.
+- Improved topic group naming to generate more descriptive multi-keyword labels.
+- Added a strict second-pass split for oversized topic clusters to reduce single broad groups.
 
 ## [0.1.0] - 2026-02-05
 - Initial Chromium extension release.

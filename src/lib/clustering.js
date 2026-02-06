@@ -505,18 +505,31 @@ export function pickTopKeywordEntries(vectors, limit) {
 }
 
 export function buildTopicLabel(vectors, config) {
-  const entries = pickTopKeywordEntries(vectors, config.titleKeywordLimit);
+  const requestedLimit =
+    Number.isFinite(config.titleKeywordLimit) && config.titleKeywordLimit > 0
+      ? Math.floor(config.titleKeywordLimit)
+      : 3;
+  const entries = pickTopKeywordEntries(vectors, Math.max(requestedLimit * 3, requestedLimit));
   if (entries.length === 0) return "Topic";
-  const labels = entries
-    .map(([word, score]) => {
-      const token = titleCase(word);
-      if (!token) return "";
-      if (!config.titleIncludeScores) return token;
-      return `${token}(${score.toFixed(2)})`;
-    })
-    .filter(Boolean);
-  const joined = labels.join(" ");
-  return abbreviateKeyword(joined);
+  const labels = [];
+  const seen = new Set();
+
+  for (const [word, score] of entries) {
+    const token = formatTopicLabelToken(word);
+    if (!token) continue;
+    const dedupeKey = token.toLowerCase();
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+    if (!config.titleIncludeScores) {
+      labels.push(token);
+    } else {
+      labels.push(`${token} (${score.toFixed(2)})`);
+    }
+    if (labels.length >= requestedLimit) break;
+  }
+
+  if (labels.length === 0) return "Topic";
+  return truncateTopicLabel(labels.join(" / "));
 }
 
 export function buildDebugKeywords(vectors, config) {
@@ -560,6 +573,10 @@ export function clusterTabs({
   const minAverageSimilarity = Math.max(
     config.minAverageSimilarityFloor,
     effectiveThreshold * config.minAverageSimilarityScale
+  );
+  const strongLinkThreshold = Math.min(
+    0.95,
+    effectiveThreshold + Math.max(0.02, (1 - effectiveThreshold) * 0.35)
   );
 
   function find(index) {
@@ -633,17 +650,25 @@ export function clusterTabs({
     }
   }
 
-  const topNeighbors = neighbors.map((list) => {
+  const topNeighborEntries = neighbors.map((list) => {
     return list
       .sort((a, b) => b.score - a.score)
-      .slice(0, kNearest)
-      .map((entry) => entry.index);
+      .slice(0, kNearest);
   });
+  const topNeighbors = topNeighborEntries.map((list) =>
+    list.map((entry) => entry.index)
+  );
 
   const topSets = topNeighbors.map((list) => new Set(list));
   for (let i = 0; i < metas.length; i += 1) {
-    for (const j of topNeighbors[i]) {
+    for (const entry of topNeighborEntries[i]) {
+      const j = entry.index;
       if (topSets[j].has(i)) {
+        union(i, j);
+        continue;
+      }
+      // Very strong one-way links are reliable enough to keep related tabs together.
+      if (entry.score >= strongLinkThreshold) {
         union(i, j);
       }
     }
@@ -674,23 +699,228 @@ export function clusterTabs({
     return count ? sum / count : 0;
   }
 
+  function averageSimilarityByPositions(vectorsInCluster, positions) {
+    if (positions.length < 2) return 1;
+    let sum = 0;
+    let count = 0;
+    for (let i = 0; i < positions.length; i += 1) {
+      for (let j = i + 1; j < positions.length; j += 1) {
+        sum += cosineSimilarity(
+          vectorsInCluster[positions[i]],
+          vectorsInCluster[positions[j]]
+        );
+        count += 1;
+      }
+    }
+    return count ? sum / count : 0;
+  }
+
+  function splitClusterWithOutlierPruning(cluster) {
+    if (cluster.tabs.length < 2) {
+      return [cluster];
+    }
+    if (cluster.tabs.length === 2) {
+      return averageSimilarity(cluster.vectors) >= minAverageSimilarity
+        ? [cluster]
+        : cluster.tabs.map((tab, index) => ({
+            tabs: [tab],
+            vectors: [cluster.vectors[index]]
+          }));
+    }
+
+    const remaining = new Set(
+      new Array(cluster.tabs.length).fill(0).map((_, index) => index)
+    );
+
+    const removeLowestCohesionTab = () => {
+      let worstIndex = -1;
+      let worstScore = Infinity;
+      const positions = Array.from(remaining);
+      for (const position of positions) {
+        let sum = 0;
+        let count = 0;
+        for (const other of positions) {
+          if (other === position) continue;
+          sum += cosineSimilarity(cluster.vectors[position], cluster.vectors[other]);
+          count += 1;
+        }
+        const avg = count ? sum / count : 0;
+        if (avg < worstScore) {
+          worstScore = avg;
+          worstIndex = position;
+        }
+      }
+      if (worstIndex !== -1) {
+        remaining.delete(worstIndex);
+      }
+    };
+
+    while (remaining.size >= 3) {
+      const positions = Array.from(remaining);
+      const avg = averageSimilarityByPositions(cluster.vectors, positions);
+      if (avg >= minAverageSimilarity) break;
+      removeLowestCohesionTab();
+    }
+
+    const corePositions = Array.from(remaining);
+    const coreIsValid =
+      corePositions.length >= 2 &&
+      averageSimilarityByPositions(cluster.vectors, corePositions) >= minAverageSimilarity;
+
+    if (!coreIsValid) {
+      return cluster.tabs.map((tab, index) => ({
+        tabs: [tab],
+        vectors: [cluster.vectors[index]]
+      }));
+    }
+
+    const coreTabs = corePositions.map((position) => cluster.tabs[position]);
+    const coreVectors = corePositions.map((position) => cluster.vectors[position]);
+    const assigned = new Set(corePositions);
+    const candidates = cluster.tabs
+      .map((_, index) => index)
+      .filter((index) => !assigned.has(index))
+      .map((index) => {
+        let best = 0;
+        let sum = 0;
+        for (const corePosition of corePositions) {
+          const score = cosineSimilarity(
+            cluster.vectors[index],
+            cluster.vectors[corePosition]
+          );
+          if (score > best) best = score;
+          sum += score;
+        }
+        const avg = corePositions.length ? sum / corePositions.length : 0;
+        return { index, best, avg };
+      })
+      .sort((a, b) => b.best - a.best);
+
+    const reattachThreshold = Math.max(
+      minAverageSimilarity * 0.8,
+      effectiveThreshold * 0.95
+    );
+
+    for (const candidate of candidates) {
+      if (candidate.best < reattachThreshold && candidate.avg < minAverageSimilarity) {
+        continue;
+      }
+      const trialVectors = [...coreVectors, cluster.vectors[candidate.index]];
+      if (averageSimilarity(trialVectors) >= minAverageSimilarity * 0.92) {
+        coreTabs.push(cluster.tabs[candidate.index]);
+        coreVectors.push(cluster.vectors[candidate.index]);
+        assigned.add(candidate.index);
+      }
+    }
+
+    const output = [{ tabs: coreTabs, vectors: coreVectors }];
+    cluster.tabs.forEach((tab, index) => {
+      if (assigned.has(index)) return;
+      output.push({
+        tabs: [tab],
+        vectors: [cluster.vectors[index]]
+      });
+    });
+    return output;
+  }
+
+  function splitLargeCluster(cluster) {
+    const size = cluster.tabs.length;
+    const minLargeClusterSize = Math.max(7, kNearest + 2);
+    if (size < minLargeClusterSize) {
+      return [cluster];
+    }
+
+    const strictThreshold = Math.min(
+      0.96,
+      Math.max(minAverageSimilarity + 0.04, effectiveThreshold + 0.06)
+    );
+    const veryStrongThreshold = Math.min(0.98, strictThreshold + 0.06);
+    const localK = Math.min(kNearest, Math.max(1, size - 1));
+    const parent = new Array(size).fill(0).map((_, index) => index);
+
+    function find(index) {
+      let root = index;
+      while (parent[root] !== root) root = parent[root];
+      while (parent[index] !== index) {
+        const next = parent[index];
+        parent[index] = root;
+        index = next;
+      }
+      return root;
+    }
+
+    function union(a, b) {
+      const rootA = find(a);
+      const rootB = find(b);
+      if (rootA === rootB) return;
+      parent[rootB] = rootA;
+    }
+
+    const neighbors = new Array(size).fill(0).map(() => []);
+    for (let i = 0; i < size; i += 1) {
+      for (let j = i + 1; j < size; j += 1) {
+        const score = cosineSimilarity(cluster.vectors[i], cluster.vectors[j]);
+        if (score < strictThreshold) continue;
+        neighbors[i].push({ index: j, score });
+        neighbors[j].push({ index: i, score });
+      }
+    }
+
+    const topNeighborEntries = neighbors.map((list) =>
+      list.sort((a, b) => b.score - a.score).slice(0, localK)
+    );
+    const topSets = topNeighborEntries.map(
+      (list) => new Set(list.map((entry) => entry.index))
+    );
+
+    for (let i = 0; i < size; i += 1) {
+      for (const entry of topNeighborEntries[i]) {
+        const j = entry.index;
+        if (topSets[j].has(i) || entry.score >= veryStrongThreshold) {
+          union(i, j);
+        }
+      }
+    }
+
+    const partsByRoot = new Map();
+    for (let i = 0; i < size; i += 1) {
+      const root = find(i);
+      const part = partsByRoot.get(root) || [];
+      part.push(i);
+      partsByRoot.set(root, part);
+    }
+
+    const components = Array.from(partsByRoot.values());
+    if (components.length < 2) return [cluster];
+
+    const multiTabParts = components.filter((part) => part.length >= 2);
+    if (multiTabParts.length < 2) return [cluster];
+
+    const largestPartSize = Math.max(...components.map((part) => part.length));
+    if (largestPartSize >= size - 1) return [cluster];
+
+    return components.map((part) => ({
+      tabs: part.map((index) => cluster.tabs[index]),
+      vectors: part.map((index) => cluster.vectors[index])
+    }));
+  }
+
   const clusters = [];
   for (const cluster of clustersByRoot.values()) {
     if (cluster.tabs.length < 2) {
       clusters.push(cluster);
       continue;
     }
-    const avg = averageSimilarity(cluster.vectors);
-    if (avg >= minAverageSimilarity) {
-      clusters.push(cluster);
-      continue;
-    }
-    for (let i = 0; i < cluster.tabs.length; i += 1) {
-      clusters.push({
-        tabs: [cluster.tabs[i]],
-        vectors: [cluster.vectors[i]]
-      });
-    }
+    const refined = splitClusterWithOutlierPruning(cluster);
+    refined.forEach((entry) => {
+      if (entry.tabs.length < 2) {
+        clusters.push(entry);
+        return;
+      }
+      const splitEntries = splitLargeCluster(entry);
+      splitEntries.forEach((splitEntry) => clusters.push(splitEntry));
+    });
   }
 
   return clusters;
@@ -701,8 +931,25 @@ function titleCase(word) {
   return `${word[0].toUpperCase()}${word.slice(1)}`;
 }
 
-function abbreviateKeyword(keyword) {
-  if (!keyword) return "";
-  if (keyword.length <= 12) return keyword;
-  return `${keyword.slice(0, 11)}…`;
+function formatTopicLabelToken(token) {
+  if (!token) return "";
+  const parts = token
+    .split("_")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => titleCase(part));
+  if (parts.length === 0) return "";
+  const joined = parts.join(" ");
+  if (/^\d+$/.test(joined)) return "";
+  return joined;
+}
+
+function truncateTopicLabel(label, maxLength = 56) {
+  if (!label) return "";
+  if (label.length <= maxLength) return label;
+  const target = Math.max(16, maxLength - 3);
+  const cut = label.slice(0, target);
+  const separatorCut = Math.max(cut.lastIndexOf(" / "), cut.lastIndexOf(" "));
+  const base = separatorCut >= 12 ? cut.slice(0, separatorCut).trim() : cut.trim();
+  return `${base}...`;
 }
