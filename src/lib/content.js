@@ -74,12 +74,11 @@ export async function fetchTabContents(tabsWithMeta, maxLength = 6000, shouldSto
   }
 
   let index = 0;
-  let warmed = 0;
   let completed = 0;
   const concurrency = Math.min(4, eligibleTabs.length);
   const timeoutMs = 4000;
-  const warmupProgressShare = warmTabsByActivation ? 0.35 : 0;
   const originalActiveTabId = warmTabsByActivation ? await getActiveTabId() : null;
+  let activationQueue = Promise.resolve();
 
   async function hasHostPermission(url) {
     if (!chrome.permissions?.contains) return null;
@@ -203,6 +202,20 @@ export async function fetchTabContents(tabsWithMeta, maxLength = 6000, shouldSto
     await sleep(200);
   }
 
+  async function runActivationTask(task) {
+    const previous = activationQueue;
+    let resolveNext = null;
+    activationQueue = new Promise((resolve) => {
+      resolveNext = resolve;
+    });
+    await previous;
+    try {
+      return await task();
+    } finally {
+      if (resolveNext) resolveNext();
+    }
+  }
+
   async function waitForTabReady(tabId, maxWaitMs = 1200) {
     const start = Date.now();
     while (Date.now() - start < maxWaitMs) {
@@ -215,17 +228,6 @@ export async function fetchTabContents(tabsWithMeta, maxLength = 6000, shouldSto
     }
   }
 
-  async function warmTab(tab) {
-    throwIfStopped();
-    await activateTab(tab.id);
-    await waitForTabReady(tab.id);
-    warmed += 1;
-    const progress = eligibleTabs.length
-      ? (warmed / eligibleTabs.length) * (warmupProgressShare * 100)
-      : 0;
-    setProgress(progress);
-  }
-
   async function getFreshTab(tabId) {
     try {
       return await chrome.tabs.get(tabId);
@@ -236,25 +238,59 @@ export async function fetchTabContents(tabsWithMeta, maxLength = 6000, shouldSto
 
   async function scanTab(tab) {
     throwIfStopped();
-    const currentTab = (await getFreshTab(tab.id)) || tab;
-    if (currentTab.discarded) return;
-    if (currentTab.status && currentTab.status !== "complete") return;
+    let currentTab = (await getFreshTab(tab.id)) || tab;
     const hasPermission = await hasHostPermission(currentTab.url || "");
     if (hasPermission === false) return;
 
-    let injected = null;
-    try {
-      injected = await runWithTimeout(
+    async function injectCurrent() {
+      return runWithTimeout(
         executeContentScript(currentTab.id),
         timeoutMs
       );
+    }
+
+    let injected = null;
+    let shouldRetryWithActivation = false;
+    try {
+      injected = await injectCurrent();
     } catch (error) {
       const message = error?.message || String(error || "");
       if (message.toLowerCase().includes("cannot access contents")) {
         stats.restricted += 1;
       }
-      return;
+      const lower = message.toLowerCase();
+      shouldRetryWithActivation =
+        warmTabsByActivation &&
+        !lower.includes("cannot access contents") &&
+        !lower.includes("missing host permission");
     }
+
+    if (
+      warmTabsByActivation &&
+      !shouldRetryWithActivation &&
+      (!injected || currentTab.discarded || (currentTab.status && currentTab.status !== "complete"))
+    ) {
+      shouldRetryWithActivation = true;
+    }
+
+    if (shouldRetryWithActivation) {
+      await runActivationTask(async () => {
+        throwIfStopped();
+        await activateTab(currentTab.id);
+        await waitForTabReady(currentTab.id, 1800);
+      });
+      currentTab = (await getFreshTab(tab.id)) || currentTab;
+      try {
+        injected = await injectCurrent();
+      } catch (error) {
+        const message = error?.message || String(error || "");
+        if (message.toLowerCase().includes("cannot access contents")) {
+          stats.restricted += 1;
+        }
+        return;
+      }
+    }
+
     throwIfStopped();
     if (!injected) return;
     const text = injected?.[0]?.result || "";
@@ -272,20 +308,13 @@ export async function fetchTabContents(tabsWithMeta, maxLength = 6000, shouldSto
       await scanTab(tab);
       completed += 1;
       const progress = eligibleTabs.length
-        ? warmupProgressShare * 100 +
-          (completed / eligibleTabs.length) * ((1 - warmupProgressShare) * 100)
+        ? (completed / eligibleTabs.length) * 100
         : 0;
       setProgress(progress);
     }
   }
 
   try {
-    if (warmTabsByActivation) {
-      for (const tab of eligibleTabs) {
-        await warmTab(tab);
-      }
-    }
-
     await Promise.all(Array.from({ length: concurrency }, () => worker()));
     setProgress(100);
     return { contentsByTabId: results, stats };

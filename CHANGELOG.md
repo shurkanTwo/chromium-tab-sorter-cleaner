@@ -17,6 +17,7 @@ All notable changes to this project will be documented in this file.
 - Improved clustering to keep strong one-way neighbor matches and prune outliers instead of splitting whole clusters.
 - Improved topic group naming to generate more descriptive multi-keyword labels.
 - Added a strict second-pass split for oversized topic clusters to reduce single broad groups.
+- Optimized content scanning to activate tabs only when needed instead of warming every eligible tab.
 
 ## [0.1.0] - 2026-02-05
 - Initial Chromium extension release.
