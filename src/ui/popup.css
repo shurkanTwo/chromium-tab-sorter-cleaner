@@ -89,56 +89,79 @@ body.window {
 .action-zones {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 9px;
 }
 
-.action-zone {
-  position: relative;
-  border-radius: 0;
-  padding: 0;
-  background: transparent;
-  border: 0;
-  box-shadow: none;
+.seg-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
-.action-zone-label {
+.seg-label {
+  width: 116px;
+  flex: 0 0 116px;
   font-size: 12px;
   letter-spacing: 0;
   color: #aeb9d8;
-  margin-bottom: 5px;
   font-weight: 500;
 }
 
-.action-zone-sorting {
-  border: 0;
-  background: transparent;
-}
-
-.action-zone-grouping {
-  border: 0;
-  background: transparent;
-}
-
-.action-zone-secondary {
-  border: 0;
-  background: transparent;
-}
-
-.actions {
+.seg-group {
+  min-width: 0;
+  flex: 1 1 auto;
   display: grid;
-  gap: 8px;
+  gap: 0;
+  border: 1px solid rgba(157, 175, 217, 0.26);
+  border-radius: 11px;
+  overflow: hidden;
+  background: linear-gradient(180deg, rgba(33, 40, 66, 0.8), rgba(25, 31, 52, 0.85));
 }
 
-.actions-sorting {
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-}
-
-.actions-grouping {
+.seg-group-sorting,
+.seg-group-controls {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.actions-secondary {
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+.seg-group-grouping {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.seg-btn {
+  min-height: 38px;
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  align-items: center;
+  justify-content: start;
+  gap: 9px;
+  width: 100%;
+  text-align: left;
+  padding: 0 12px;
+  border: 0;
+  border-right: 1px solid rgba(151, 169, 214, 0.24);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.seg-btn:last-child {
+  border-right: 0;
+}
+
+.seg-btn:hover {
+  transform: none;
+  border-color: transparent;
+  background: linear-gradient(180deg, rgba(58, 70, 108, 0.75), rgba(41, 50, 79, 0.78));
+  box-shadow: none;
+}
+
+.seg-btn:active {
+  transform: none;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.seg-btn-ghost:hover {
+  background: linear-gradient(180deg, rgba(51, 61, 95, 0.65), rgba(38, 46, 73, 0.68));
 }
 
 .toolbar-row {
@@ -156,38 +179,8 @@ body.window {
   z-index: 40;
 }
 
-.actions button {
-  display: grid;
-  grid-template-columns: 18px 1fr;
-  align-items: center;
-  justify-content: start;
-  gap: 10px;
-  width: 100%;
-  min-height: 36px;
-  text-align: left;
-  padding-left: 14px;
-}
-
-.actions button span {
+.seg-btn span {
   white-space: nowrap;
-}
-
-.actions-sorting button {
-  min-height: 38px;
-  border-color: rgba(160, 179, 220, 0.33);
-  background: linear-gradient(180deg, rgba(43, 51, 80, 0.82), rgba(32, 37, 58, 0.82));
-}
-
-.actions-grouping button {
-  min-height: 38px;
-  border-color: rgba(146, 176, 229, 0.34);
-  background: linear-gradient(180deg, rgba(44, 56, 91, 0.82), rgba(30, 38, 62, 0.82));
-}
-
-.actions-secondary button {
-  min-height: 36px;
-  border-color: rgba(153, 167, 212, 0.26);
-  background: linear-gradient(180deg, rgba(37, 45, 72, 0.7), rgba(28, 34, 56, 0.7));
 }
 
 button {
@@ -338,43 +331,44 @@ body.config-open .config-toggle-btn .icon-close {
   border-radius: 16px;
   background: linear-gradient(180deg, rgba(23, 30, 51, 0.88), rgba(17, 22, 38, 0.94));
   box-shadow: 0 22px 40px rgba(0, 0, 0, 0.45);
-  padding: 16px;
+  padding: 12px;
 }
 
 .config-overlay-header {
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .config-overlay-title {
-  font-size: 22px;
+  font-size: 19px;
   font-weight: 700;
   color: #e6eeff;
   margin: 0;
 }
 
 .config-overlay-subtitle {
-  margin: 4px 0 0;
-  font-size: 13px;
+  margin: 2px 0 0;
+  font-size: 12px;
   line-height: 1.4;
   color: #9fabc9;
 }
 
 .config-list {
-  margin-top: 4px;
+  margin-top: 2px;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px 14px;
+  gap: 8px 10px;
+  align-items: start;
 }
 
 .config-field {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  font-size: 13px;
+  gap: 8px;
+  font-size: 12px;
   color: var(--muted);
   font-weight: 600;
-  min-height: 34px;
+  min-height: 30px;
 }
 
 .config-check {
@@ -384,45 +378,46 @@ body.config-open .config-toggle-btn .icon-close {
 .config-stack {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
   border-radius: 10px;
   border: 1px solid rgba(155, 173, 218, 0.18);
   background: linear-gradient(180deg, rgba(31, 39, 63, 0.5), rgba(22, 28, 47, 0.64));
-  padding: 10px;
+  padding: 8px;
+  align-self: start;
 }
 
-.config-list .config-stack:last-child {
+.config-stack-wide {
   grid-column: span 2;
 }
 
 .config-help {
   margin: 0;
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1.35;
   color: #8f9ec3;
 }
 
 .config-field input[type="number"],
 .config-field select {
-  width: 164px;
+  width: 150px;
   border: 1px solid rgba(170, 182, 221, 0.42);
   border-radius: 8px;
-  padding: 7px 10px;
-  font-size: 13px;
+  padding: 6px 8px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--ink);
   background: rgba(32, 39, 63, 0.88);
 }
 
 #groupColor {
-  width: 320px;
+  width: 250px;
 }
 
 .config-field input[type="checkbox"] {
   margin: 0;
   accent-color: var(--accent);
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
 }
 
 .config-reset {
@@ -700,10 +695,31 @@ body.config-open .config-reset-top {
     gap: 14px;
   }
 
-  .actions-sorting,
-  .actions-grouping,
-  .actions-secondary {
+  .seg-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 5px;
+  }
+
+  .seg-label {
+    width: auto;
+    flex: 0 0 auto;
+  }
+
+  .seg-group-sorting,
+  .seg-group-grouping,
+  .seg-group-controls {
     grid-template-columns: 1fr;
+  }
+
+  .seg-btn {
+    min-height: 36px;
+    border-right: 0;
+    border-bottom: 1px solid rgba(151, 169, 214, 0.24);
+  }
+
+  .seg-btn:last-child {
+    border-bottom: 0;
   }
 
   button {
@@ -723,7 +739,7 @@ body.config-open .config-reset-top {
     gap: 10px;
   }
 
-  .config-list .config-stack:last-child {
+  .config-stack-wide {
     grid-column: auto;
   }
 

@@ -35,6 +35,9 @@ All notable changes to this project will be documented in this file.
 - Flattened configuration into one clear list with more explicit option labels and a smaller inline reset button.
 - Moved reset-to-defaults into a top pill button beside the config close control for quicker access.
 - Simplified action area visuals by removing section card containers and using regular-weight button text.
+- Reworked main actions into a compact toolbar with segmented controls for Sorting, Grouping, and Group controls.
+- Compacted the configuration panel with tighter spacing and a denser multi-column settings layout.
+- Refined config overlay density with a cleaner two-column layout and full-width rows for verbose topic settings.
 
 ## [0.1.0] - 2026-02-05
 - Initial Chromium extension release.
