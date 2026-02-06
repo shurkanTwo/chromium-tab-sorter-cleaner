@@ -18,6 +18,8 @@ All notable changes to this project will be documented in this file.
 - Improved topic group naming to generate more descriptive multi-keyword labels.
 - Added a strict second-pass split for oversized topic clusters to reduce single broad groups.
 - Optimized content scanning to activate tabs only when needed instead of warming every eligible tab.
+- Changed domain grouping names to use full hostnames.
+- Domain group names now strip a leading `www`/`wwwN` prefix.
 
 ## [0.1.0] - 2026-02-05
 - Initial Chromium extension release.

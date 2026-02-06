@@ -580,14 +580,6 @@ export async function sortByLastVisited() {
   await refresh();
 }
 
-function abbreviateDomain(hostname) {
-  if (!hostname) return "";
-  const parts = hostname.split(".").filter(Boolean);
-  if (parts.length === 0) return "";
-  const letters = parts.map((part) => part[0]).join("");
-  return letters.slice(0, 6).toUpperCase();
-}
-
 export async function groupByDomain() {
   const startedAt = Date.now();
   const runNumber = domainGroupingRunCount + 1;
@@ -648,7 +640,7 @@ export async function groupByDomain() {
       groupedTabs += plan.tabIds.length;
       const updatePayload = {};
       if (useNames && plan.host) {
-        updatePayload.title = abbreviateDomain(plan.host);
+        updatePayload.title = plan.host.replace(/^www\d?\./i, "");
       }
       if (color) updatePayload.color = color;
       if (collapseAfter) updatePayload.collapsed = true;
