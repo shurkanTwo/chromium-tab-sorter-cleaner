@@ -12,6 +12,8 @@ All notable changes to this project will be documented in this file.
 - Deduplicated popup/settings binding definitions via shared `setting_definitions.js`.
 - Refined mobile action-window CSS overrides for narrow widths.
 - Extracted shared helper for tab-group update payload handling.
+- Tuned default topic-clustering thresholds and weights to reduce missed group merges.
+- Added a configuration button to reset all settings to defaults.
 
 ## [0.1.0] - 2026-02-05
 - Initial Chromium extension release.

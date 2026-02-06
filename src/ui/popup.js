@@ -1,6 +1,6 @@
 import { CONFIG, settings } from "../lib/config.js";
 import { elements, reportError, setStatus, setTopicGroupingRunning } from "../lib/ui.js";
-import { loadSettings, saveSettings } from "../lib/settings.js";
+import { loadSettings, resetSettingsToDefaults, saveSettings } from "../lib/settings.js";
 import { SETTING_BINDINGS } from "../lib/setting_definitions.js";
 import {
   closeDuplicates,
@@ -85,6 +85,15 @@ if (elements.copyDebugReportLink) {
   elements.copyDebugReportLink.addEventListener("click", (event) => {
     event.preventDefault();
     copyDebugReport();
+  });
+}
+if (elements.resetSettingsButton) {
+  elements.resetSettingsButton.addEventListener("click", async () => {
+    const confirmed = window.confirm("Reset all configuration values to defaults?");
+    if (!confirmed) return;
+    await resetSettingsToDefaults();
+    await refresh();
+    setStatus("Settings reset to defaults.");
   });
 }
 

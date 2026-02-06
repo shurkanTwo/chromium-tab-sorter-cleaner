@@ -47,7 +47,8 @@ export const elements = {
   cfgThresholdHighInput: document.getElementById("cfgThresholdHigh"),
   cfgThresholdMediumInput: document.getElementById("cfgThresholdMedium"),
   cfgThresholdLowInput: document.getElementById("cfgThresholdLow"),
-  cfgThresholdFallbackInput: document.getElementById("cfgThresholdFallback")
+  cfgThresholdFallbackInput: document.getElementById("cfgThresholdFallback"),
+  resetSettingsButton: document.getElementById("resetSettings")
 };
 
 export function setStatus(message) {

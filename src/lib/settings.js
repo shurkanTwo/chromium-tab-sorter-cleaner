@@ -1,4 +1,4 @@
-import { CONFIG, SETTINGS_KEY, settings } from "./config.js";
+import { CONFIG, DEFAULT_CONFIG, SETTINGS_KEY, settings } from "./config.js";
 import { elements } from "./ui.js";
 import { SETTING_BINDINGS } from "./setting_definitions.js";
 
@@ -19,6 +19,27 @@ function getBindingTarget(section) {
   return null;
 }
 
+function replaceValues(target, source) {
+  Object.keys(target).forEach((key) => {
+    delete target[key];
+  });
+  Object.assign(target, source);
+}
+
+function syncSettingsToInputs() {
+  for (const binding of SETTING_BINDINGS) {
+    const target = getBindingTarget(binding.section);
+    if (!target) continue;
+    const element = elements[binding.elementKey];
+    if (!element) continue;
+    if (binding.type === "boolean") {
+      setCheckbox(element, target[binding.key]);
+      continue;
+    }
+    setInputValue(element, target[binding.key]);
+  }
+}
+
 export async function loadSettings() {
   const data = await chrome.storage.local.get([SETTINGS_KEY]);
   const stored = data[SETTINGS_KEY];
@@ -35,17 +56,7 @@ export async function loadSettings() {
       Object.assign(settings, stored);
     }
   }
-  for (const binding of SETTING_BINDINGS) {
-    const target = getBindingTarget(binding.section);
-    if (!target) continue;
-    const element = elements[binding.elementKey];
-    if (!element) continue;
-    if (binding.type === "boolean") {
-      setCheckbox(element, target[binding.key]);
-      continue;
-    }
-    setInputValue(element, target[binding.key]);
-  }
+  syncSettingsToInputs();
 }
 
 export function saveSettings() {
@@ -56,4 +67,12 @@ export function saveSettings() {
       topicThresholds: CONFIG.topicThresholds
     }
   });
+}
+
+export async function resetSettingsToDefaults() {
+  replaceValues(settings, DEFAULT_CONFIG.settings);
+  replaceValues(CONFIG.topicCluster, DEFAULT_CONFIG.topicCluster);
+  replaceValues(CONFIG.topicThresholds, DEFAULT_CONFIG.topicThresholds);
+  await saveSettings();
+  syncSettingsToInputs();
 }
