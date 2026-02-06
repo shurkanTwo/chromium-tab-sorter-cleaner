@@ -38,6 +38,13 @@ All notable changes to this project will be documented in this file.
 - Reworked main actions into a compact toolbar with segmented controls for Sorting, Grouping, and Group controls.
 - Compacted the configuration panel with tighter spacing and a denser multi-column settings layout.
 - Refined config overlay density with a cleaner two-column layout and full-width rows for verbose topic settings.
+- Simplified the configuration area into a compact single-column option list with list-style rows.
+- Removed config list bullets and reduced row/control heights for a tighter compact settings list.
+- Polished toolbar/status/footer spacing, contrast, and segmented row styling.
+- Moved the configuration title to the top overlay header above the target-window row.
+- Fixed config overlay visibility regression (hidden state respected again) and expanded config panel to full overlay width.
+- Increased action-window popup height to 800px when opening/focusing the action window.
+- Anchored the status/progress section and footer to the bottom of the action window layout.
 
 ## [0.1.0] - 2026-02-05
 - Initial Chromium extension release.

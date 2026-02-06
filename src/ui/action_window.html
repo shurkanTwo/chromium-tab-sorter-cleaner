@@ -131,25 +131,24 @@
     </button>
 
     <section id="configOverlay" class="config-overlay" hidden>
+      <div class="config-overlay-header">
+        <div class="config-overlay-title">Configuration</div>
+      </div>
       <div class="config-overlay-card">
-        <div class="config-overlay-header">
-          <div class="config-overlay-title">Configuration</div>
-          <p class="config-overlay-subtitle">Adjust grouping and sorting behavior for this window.</p>
-        </div>
         <div class="config-list">
-          <div class="config-stack">
+          <div class="config-item">
             <label class="config-field config-check">
               <input type="checkbox" id="nameGroups" checked />
               <span>Name created tab groups (domain/topic)</span>
             </label>
           </div>
-          <div class="config-stack">
+          <div class="config-item">
             <label class="config-field config-check">
               <input type="checkbox" id="collapseAfterGroup" />
               <span>Collapse groups immediately after creating them</span>
             </label>
           </div>
-          <div class="config-stack">
+          <div class="config-item">
             <label class="config-field">
               <span>Color for newly created groups</span>
               <select id="groupColor">
@@ -166,13 +165,13 @@
               </select>
             </label>
           </div>
-          <div class="config-stack">
+          <div class="config-item">
             <label class="config-field config-check">
               <input type="checkbox" id="includePinnedTabs" />
               <span>Include pinned tabs in actions</span>
             </label>
           </div>
-          <div class="config-stack">
+          <div class="config-item">
             <label class="config-field">
               <span>Sort by last visited: tab order</span>
               <select id="lastVisitedOrder">
@@ -181,18 +180,17 @@
               </select>
             </label>
           </div>
-          <div class="config-stack config-stack-wide">
+          <div class="config-item">
             <label class="config-field">
               <span>Group by topic: sensitivity</span>
               <select id="topicSensitivity">
-                <option value="low">Low</option>
-                <option value="medium" selected>Medium</option>
-                <option value="high">High</option>
+                <option value="low">Broad matching</option>
+                <option value="medium" selected>Balanced</option>
+                <option value="high">Strict matching</option>
               </select>
             </label>
-            <p class="config-help">Low groups more broadly, High groups more strictly.</p>
           </div>
-          <div class="config-stack config-stack-wide">
+          <div class="config-item">
             <label class="config-field config-check">
               <input type="checkbox" id="activateTabsForContent" />
               <span>Group by topic: activate tabs for content scan</span>

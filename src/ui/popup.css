@@ -89,22 +89,22 @@ body.window {
 .action-zones {
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  gap: 8px;
 }
 
 .seg-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .seg-label {
   width: 116px;
   flex: 0 0 116px;
-  font-size: 12px;
+  font-size: 11px;
   letter-spacing: 0;
-  color: #aeb9d8;
-  font-weight: 500;
+  color: #98a6cb;
+  font-weight: 400;
 }
 
 .seg-group {
@@ -112,10 +112,10 @@ body.window {
   flex: 1 1 auto;
   display: grid;
   gap: 0;
-  border: 1px solid rgba(157, 175, 217, 0.26);
+  border: 1px solid rgba(157, 175, 217, 0.22);
   border-radius: 11px;
   overflow: hidden;
-  background: linear-gradient(180deg, rgba(33, 40, 66, 0.8), rgba(25, 31, 52, 0.85));
+  background: linear-gradient(180deg, rgba(33, 40, 66, 0.78), rgba(25, 31, 52, 0.82));
 }
 
 .seg-group-sorting,
@@ -127,8 +127,23 @@ body.window {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.seg-group-sorting {
+  border-color: rgba(157, 188, 240, 0.26);
+  background: linear-gradient(180deg, rgba(34, 47, 78, 0.8), rgba(26, 35, 58, 0.84));
+}
+
+.seg-group-grouping {
+  border-color: rgba(120, 221, 241, 0.26);
+  background: linear-gradient(180deg, rgba(29, 50, 72, 0.76), rgba(24, 37, 56, 0.84));
+}
+
+.seg-group-controls {
+  border-color: rgba(154, 168, 206, 0.2);
+  background: linear-gradient(180deg, rgba(31, 39, 63, 0.74), rgba(24, 31, 50, 0.8));
+}
+
 .seg-btn {
-  min-height: 38px;
+  min-height: 36px;
   display: grid;
   grid-template-columns: 18px 1fr;
   align-items: center;
@@ -146,6 +161,12 @@ body.window {
 
 .seg-btn:last-child {
   border-right: 0;
+}
+
+.seg-btn .btn-icon {
+  width: 16px;
+  height: 16px;
+  opacity: 0.88;
 }
 
 .seg-btn:hover {
@@ -317,16 +338,24 @@ body.config-open .config-toggle-btn .icon-close {
   position: fixed;
   inset: 0;
   z-index: 30;
-  padding: 62px 16px 16px;
+  padding: 12px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   overflow-y: auto;
   background:
     radial-gradient(860px 640px at 90% 8%, rgba(74, 113, 196, 0.22), transparent 62%),
     linear-gradient(155deg, rgba(8, 12, 24, 0.95) 0%, rgba(11, 15, 29, 0.97) 100%);
 }
 
+.config-overlay[hidden] {
+  display: none !important;
+}
+
 .config-overlay-card {
-  margin: 0 auto;
-  max-width: 920px;
+  margin: 0;
+  width: 100%;
+  max-width: none;
   border: 1px solid rgba(167, 184, 226, 0.3);
   border-radius: 16px;
   background: linear-gradient(180deg, rgba(23, 30, 51, 0.88), rgba(17, 22, 38, 0.94));
@@ -335,7 +364,13 @@ body.config-open .config-toggle-btn .icon-close {
 }
 
 .config-overlay-header {
-  margin-bottom: 8px;
+  margin: 0;
+  padding-top: 4px;
+  padding-left: 2px;
+  padding-right: 260px;
+  min-height: 34px;
+  display: flex;
+  align-items: center;
 }
 
 .config-overlay-title {
@@ -354,46 +389,43 @@ body.config-open .config-toggle-btn .icon-close {
 
 .config-list {
   margin-top: 2px;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px 10px;
-  align-items: start;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
 }
 
 .config-field {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 8px;
   font-size: 12px;
   color: var(--muted);
   font-weight: 600;
-  min-height: 30px;
+  min-height: 24px;
 }
 
 .config-check {
   justify-content: flex-start;
 }
 
-.config-stack {
+.config-item {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  border-radius: 10px;
-  border: 1px solid rgba(155, 173, 218, 0.18);
-  background: linear-gradient(180deg, rgba(31, 39, 63, 0.5), rgba(22, 28, 47, 0.64));
-  padding: 8px;
-  align-self: start;
+  gap: 2px;
+  padding: 2px 0 4px 0;
+  border-bottom: 1px solid rgba(154, 169, 208, 0.12);
 }
 
-.config-stack-wide {
-  grid-column: span 2;
+.config-item:last-child {
+  border-bottom: 0;
 }
 
 .config-help {
   margin: 0;
-  font-size: 11px;
-  line-height: 1.35;
+  font-size: 10px;
+  line-height: 1.25;
   color: #8f9ec3;
 }
 
@@ -402,22 +434,22 @@ body.config-open .config-toggle-btn .icon-close {
   width: 150px;
   border: 1px solid rgba(170, 182, 221, 0.42);
   border-radius: 8px;
-  padding: 6px 8px;
-  font-size: 12px;
+  padding: 4px 8px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--ink);
   background: rgba(32, 39, 63, 0.88);
 }
 
 #groupColor {
-  width: 250px;
+  width: 240px;
 }
 
 .config-field input[type="checkbox"] {
   margin: 0;
   accent-color: var(--accent);
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
 }
 
 .config-reset {
@@ -456,13 +488,14 @@ body.config-open .config-reset-top {
   flex-direction: column;
   gap: 6px;
   flex: 0 0 auto;
+  margin-top: auto;
 }
 
 .status-text {
   flex: 1 1 auto;
   min-height: 14px;
   font-size: 11px;
-  color: #a9b6d8;
+  color: #c3cfea;
   line-height: 1.4;
 }
 
@@ -619,16 +652,16 @@ body.config-open .config-reset-top {
 }
 
 .footer-disclaimer {
-  padding: 8px 16px 12px;
+  padding: 6px 16px 10px;
   font-size: 10px;
-  color: #8f9bb9;
+  color: #99a8cb;
   line-height: 1.4;
   border-top: 1px solid rgba(255, 255, 255, 0.12);
   background: linear-gradient(180deg, rgba(16, 20, 34, 0.92), rgba(12, 16, 28, 0.96));
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
   flex: 0 0 auto;
 }
 
@@ -727,7 +760,11 @@ body.config-open .config-reset-top {
   }
 
   .config-overlay {
-    padding: 58px 10px 10px;
+    padding: 10px;
+  }
+
+  .config-overlay-header {
+    padding-right: 0;
   }
 
   .config-overlay-card {
@@ -735,17 +772,16 @@ body.config-open .config-reset-top {
   }
 
   .config-list {
-    grid-template-columns: 1fr;
-    gap: 10px;
-  }
-
-  .config-stack-wide {
-    grid-column: auto;
+    gap: 6px;
   }
 
   .config-field {
     font-size: 12px;
     min-height: 32px;
+  }
+
+  .config-item {
+    padding-left: 12px;
   }
 
   .config-help {

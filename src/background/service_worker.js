@@ -115,7 +115,7 @@ chrome.runtime.onSuspend.addListener(() => {
 async function openActionWindow(sourceTab) {
   const targetWindowId = sourceTab?.windowId ?? null;
   const width = 760;
-  const height = 520;
+  const height = 375;
   const actionWindowPrefix = chrome.runtime.getURL("src/ui/action_window.html");
   const url = chrome.runtime.getURL(
     targetWindowId != null

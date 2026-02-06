@@ -28,8 +28,10 @@ export const elements = {
 };
 
 export function setStatus(message) {
-  if (!elements.statusMessage) return;
-  elements.statusMessage.textContent = message || "";
+  const nextMessage = message || "";
+  if (elements.statusMessage) {
+    elements.statusMessage.textContent = nextMessage;
+  }
 }
 
 export function setProgress(percent) {
