@@ -5,7 +5,7 @@ As of: 2026-02-06
 ## Privacy (Form)
 
 ### Single Purpose (Description)
-Tab Sorter Cleaner is solely for local organization and cleanup of tabs in the current browser window: sort tabs, close duplicates, group tabs (domain/topic), and display activity in a clear way.
+Manage Tabs - Auto Group, Sort and Clean is solely for local organization and cleanup of tabs in the current browser window: sort tabs, close duplicates, group tabs (domain/topic), and display activity in a clear way.
 
 ### Permission Justifications
 

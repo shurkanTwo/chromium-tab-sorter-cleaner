@@ -1,4 +1,4 @@
-# Tab Sorter Cleaner
+# Manage Tabs - Auto Group, Sort and Clean
 
 ![Demo animation](docs/assets/demo.gif)
 

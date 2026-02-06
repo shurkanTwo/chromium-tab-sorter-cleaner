@@ -4,7 +4,7 @@
 Sort tabs, close duplicates, group by domain or topic, and review recent activity from a dedicated action window.
 
 ## Detailed Description
-Tab Sorter Cleaner helps you tame tab overload in seconds.
+Manage Tabs - Auto Group, Sort and Clean helps you tame tab overload in seconds.
 
 Use the window to:
 - Sort tabs A–Z or by last visited (for the target window)

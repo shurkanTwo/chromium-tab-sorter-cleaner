@@ -2,7 +2,7 @@
 
 Last updated: 2026-02-05
 
-Tab Sorter Cleaner is a Chromium extension that helps you sort tabs, close
+Manage Tabs - Auto Group, Sort and Clean is a Chromium extension that helps you sort tabs, close
 duplicates, group tabs by domain or topic, and review recent activity.
 
 ## Data We Access

@@ -1,12 +1,12 @@
 {
   "manifest_version": 3,
-  "name": "Tab Sorter Cleaner",
+  "name": "Manage Tabs - Auto Group, Sort and Clean",
   "version": "0.1.0",
   "description": "Sort tabs, close duplicates, and inspect recent activity.",
   "permissions": ["tabs", "history", "storage", "tabGroups", "scripting"],
   "optional_host_permissions": ["<all_urls>"],
   "action": {
-    "default_title": "Tab Sorter",
+    "default_title": "Manage Tabs",
     "default_icon": {
       "16": "icons/icon-16.png",
       "32": "icons/icon-32.png",
@@ -22,7 +22,7 @@
       "suggested_key": {
         "default": "Alt+Shift+T"
       },
-      "description": "Open Tab Sorter Cleaner window"
+      "description": "Open Manage Tabs window"
     }
   },
   "icons": {
