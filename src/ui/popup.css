@@ -61,12 +61,6 @@ body.window {
   box-shadow: var(--glow);
 }
 
-.title {
-  font-weight: 700;
-  font-size: 17px;
-  letter-spacing: 0.3px;
-  text-transform: uppercase;
-}
 
 .target-window {
   border: 1px solid rgba(109, 247, 255, 0.32);
@@ -123,10 +117,14 @@ body.window {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.toolbar-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .actions-header {
-  position: absolute;
-  top: 16px;
-  right: 20px;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -191,8 +189,8 @@ button:disabled {
 }
 
 .undo-icon-btn {
-  width: 42px;
-  height: 42px;
+  width: 36px;
+  height: 36px;
   border-radius: 999px;
   padding: 0;
   display: inline-flex;
@@ -207,8 +205,8 @@ button:disabled {
 }
 
 .stop-icon-btn {
-  width: 42px;
-  height: 42px;
+  width: 36px;
+  height: 36px;
   border-radius: 999px;
   padding: 0;
   display: inline-flex;
@@ -218,6 +216,11 @@ button:disabled {
 
 .stop-icon-btn:hover {
   border-color: rgba(255, 150, 161, 0.82);
+}
+
+.stop-icon-btn .btn-icon {
+  width: 18px;
+  height: 18px;
 }
 
 .btn-icon {
@@ -241,8 +244,8 @@ button:disabled {
 }
 
 .undo-icon-btn .btn-icon {
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
   color: #f3f6ff;
 }
 
