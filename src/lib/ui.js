@@ -98,6 +98,33 @@ export function renderTabs(tabsWithMeta, onTabClick) {
   if (elements.tabsList) elements.tabsList.innerHTML = "";
   if (elements.tabCount) elements.tabCount.textContent = tabsWithMeta.length.toString();
 
+  function renderDetailLine(label, value) {
+    const row = document.createElement("div");
+    const strong = document.createElement("strong");
+    strong.textContent = `${label}:`;
+    row.appendChild(strong);
+    row.append(` ${value}`);
+    return row;
+  }
+
+  function renderDetails(meta) {
+    if (!elements.detailsBody) return;
+    elements.detailsBody.replaceChildren(
+      renderDetailLine("Title", meta.tab.title || "(untitled)"),
+      renderDetailLine("URL", meta.tab.url || ""),
+      renderDetailLine("Last visited", formatDate(meta.lastVisited)),
+      renderDetailLine("Time spent", formatDuration(meta.timeSpent)),
+      (() => {
+        const row = document.createElement("div");
+        const badge = document.createElement("span");
+        badge.className = "badge";
+        badge.textContent = meta.hostname || "No domain";
+        row.appendChild(badge);
+        return row;
+      })()
+    );
+  }
+
   tabsWithMeta.forEach((meta) => {
     if (!meta || !meta.tab || !elements.tabsList) return;
     const li = document.createElement("li");
@@ -115,14 +142,7 @@ export function renderTabs(tabsWithMeta, onTabClick) {
     li.append(title, url);
 
     li.addEventListener("mouseenter", () => {
-      if (!elements.detailsBody) return;
-      elements.detailsBody.innerHTML = `
-        <div><strong>Title:</strong> ${meta.tab.title || "(untitled)"}</div>
-        <div><strong>URL:</strong> ${meta.tab.url || ""}</div>
-        <div><strong>Last visited:</strong> ${formatDate(meta.lastVisited)}</div>
-        <div><strong>Time spent:</strong> ${formatDuration(meta.timeSpent)}</div>
-        <div><span class="badge">${meta.hostname || "No domain"}</span></div>
-      `;
+      renderDetails(meta);
     });
 
     if (typeof onTabClick === "function") {
