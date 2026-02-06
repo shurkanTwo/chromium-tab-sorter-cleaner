@@ -72,6 +72,15 @@ export async function runIgnoringMissingTab(promise, context) {
   }
 }
 
+export async function updateGroupIfNeeded(groupId, updatePayload) {
+  if (groupId == null || !updatePayload) return;
+  if (Object.keys(updatePayload).length === 0) return;
+  await runIgnoringMissingTab(
+    chrome.tabGroups.update(groupId, updatePayload),
+    "tabGroups.update"
+  );
+}
+
 export async function loadUndoStack() {
   const storage = getUndoStorage();
   const data = await storage.get([UNDO_KEY]);
@@ -302,12 +311,7 @@ async function restoreState(state) {
       if (typeof meta.collapsed === "boolean") {
         updatePayload.collapsed = meta.collapsed;
       }
-      if (Object.keys(updatePayload).length > 0) {
-        await runIgnoringMissingTab(
-          chrome.tabGroups.update(newGroupId, updatePayload),
-          "tabGroups.update"
-        );
-      }
+      await updateGroupIfNeeded(newGroupId, updatePayload);
     }
   }
 
@@ -648,12 +652,7 @@ export async function groupByDomain() {
       }
       if (color) updatePayload.color = color;
       if (collapseAfter) updatePayload.collapsed = true;
-      if (Object.keys(updatePayload).length > 0) {
-        await runIgnoringMissingTab(
-          chrome.tabGroups.update(groupId, updatePayload),
-          "tabGroups.update"
-        );
-      }
+      await updateGroupIfNeeded(groupId, updatePayload);
     }
 
     for (const meta of sorted) {

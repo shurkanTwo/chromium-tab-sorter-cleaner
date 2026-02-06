@@ -21,6 +21,7 @@ import {
   isValidTabMeta,
   refresh,
   runIgnoringMissingTab,
+  updateGroupIfNeeded,
   ungroupAllTabsInternal
 } from "./tabs.js";
 import {
@@ -334,12 +335,7 @@ export async function groupByTopic() {
       }
       if (color) updatePayload.color = color;
       if (collapseAfter) updatePayload.collapsed = true;
-      if (Object.keys(updatePayload).length > 0) {
-        await runIgnoringMissingTab(
-          chrome.tabGroups.update(groupId, updatePayload),
-          "tabGroups.update"
-        );
-      }
+      await updateGroupIfNeeded(groupId, updatePayload);
     }
 
     throwIfCancelled(runState);
