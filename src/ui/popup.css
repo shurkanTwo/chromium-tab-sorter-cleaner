@@ -538,6 +538,12 @@ button:disabled {
     min-height: 520px;
   }
 
+  body.window {
+    min-width: 360px;
+    height: auto;
+    min-height: 520px;
+  }
+
   .content {
     grid-template-columns: 1fr;
   }
