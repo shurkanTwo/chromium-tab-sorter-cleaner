@@ -48,10 +48,12 @@ function schedulePersist(delayMs = 200) {
 
 function commitActiveTime() {
   if (state.activeTabId == null || state.lastActivatedAt == null) return;
-  const delta = nowMs() - state.lastActivatedAt;
+  const committedAt = nowMs();
+  const delta = committedAt - state.lastActivatedAt;
   if (!Number.isFinite(delta) || delta <= 0) return;
   const current = state.timeByTabId[state.activeTabId] || 0;
   state.timeByTabId[state.activeTabId] = current + delta;
+  state.lastActivatedAt = committedAt;
 }
 
 async function handleActivated(activeInfo) {
