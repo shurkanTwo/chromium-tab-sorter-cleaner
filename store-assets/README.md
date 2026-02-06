@@ -8,19 +8,19 @@ Use this folder for files that are uploaded in the Chrome Web Store listing UI.
 - At least 1 screenshot:
   - Preferred: 1280x800 PNG or JPG
   - Alternative: 640x400 PNG or JPG
-  - Current: `screenshot-01-1280x800.png`
+  - Current files in this repo: `screenshot_01.png`, `screenshot_02.png`
 
 ## Optional (Recommended)
 
 - Small promo tile: 440x280 PNG or JPG
-  - Current: `small-promo-440x280.png`
+  - Current file in this repo: `advertisement_tile.png`
 - Marquee promo tile: 1400x560 PNG or JPG
 
 ## Suggested File Names
 
-- `screenshot-01-1280x800.png`
-- `screenshot-02-1280x800.png`
-- `small-promo-440x280.png`
+- `screenshot_01.png`
+- `screenshot_02.png`
+- `advertisement_tile.png`
 - `marquee-1400x560.png`
 
 ## Quick Publish Checklist

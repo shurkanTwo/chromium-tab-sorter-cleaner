@@ -6,6 +6,12 @@ All notable changes to this project will be documented in this file.
 - Documentation refresh for README, privacy policy, and GitHub Pages copy.
 - Added `scripts/package-cws.sh` to produce a Chrome Web Store upload ZIP.
 - Added `store-assets/README.md` with required CWS listing asset specs and publish checklist.
+- Fixed tab time tracking overcount when data is read repeatedly.
+- Replaced details panel `innerHTML` rendering with safe DOM construction.
+- Loaded tracker state before processing tracker events/messages to avoid startup race conditions.
+- Deduplicated popup/settings binding definitions via shared `setting_definitions.js`.
+- Refined mobile action-window CSS overrides for narrow widths.
+- Extracted shared helper for tab-group update payload handling.
 
 ## [0.1.0] - 2026-02-05
 - Initial Chromium extension release.

@@ -26,5 +26,5 @@ If you want fewer tabs and more focus, Manage Tabs - Auto Group, Sort and Clean 
 ## Privacy
 
 No data is sold or shared. All data stays local in the browser.
-Privacy policy: `PRIVACY.md`
+Privacy policy (repo): https://github.com/shurkantwo/chromium-tab-sorter-cleaner/blob/main/PRIVACY.md
 Public privacy page: https://shurkantwo.github.io/chromium-tab-sorter-cleaner/

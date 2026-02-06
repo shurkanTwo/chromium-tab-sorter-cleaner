@@ -14,6 +14,7 @@ Manage Tabs - Auto Group, Sort and Clean is solely for local organization and cl
 - `storage`: Required to store settings, undo snapshots, and local tab time data.
 - `tabGroups`: Required to create, name, color, collapse/expand, and remove tab groups.
 - `scripting`: Required to read visible page text when the optional content‑scan topic grouping is used.
+- Optional host permission (`<all_urls>`): Requested at runtime only when content-based topic grouping is used.
 
 ### Do you use Remote Code?
 No. The extension does not load external JS/Wasm and does not use `eval()`.
