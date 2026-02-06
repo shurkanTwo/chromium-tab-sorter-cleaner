@@ -57,6 +57,7 @@ function commitActiveTime() {
 }
 
 async function handleActivated(activeInfo) {
+  await ensureStateLoaded();
   commitActiveTime();
   state.activeTabId = activeInfo.tabId;
   state.activeWindowId = activeInfo.windowId;
@@ -65,6 +66,7 @@ async function handleActivated(activeInfo) {
 }
 
 async function handleWindowFocus(windowId) {
+  await ensureStateLoaded();
   if (windowId === chrome.windows.WINDOW_ID_NONE) {
     commitActiveTime();
     state.activeTabId = null;
@@ -84,6 +86,7 @@ async function handleWindowFocus(windowId) {
 }
 
 async function handleRemoved(tabId) {
+  await ensureStateLoaded();
   commitActiveTime();
   delete state.timeByTabId[tabId];
   if (state.activeTabId === tabId) {
@@ -171,9 +174,16 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type === "getTabTimes") {
-    commitActiveTime();
-    sendResponse({ timeByTabId: state.timeByTabId });
-    schedulePersist();
+    ensureStateLoaded()
+      .then(() => {
+        commitActiveTime();
+        sendResponse({ timeByTabId: state.timeByTabId });
+        schedulePersist();
+      })
+      .catch((error) => {
+        console.error("Failed to load tracker state for getTabTimes:", error);
+        sendResponse({ timeByTabId: state.timeByTabId });
+      });
     return true;
   }
   return undefined;
