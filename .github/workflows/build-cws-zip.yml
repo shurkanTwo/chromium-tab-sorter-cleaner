@@ -1,0 +1,29 @@
+name: Build CWS Zip
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "manifest.json"
+      - "src/**"
+      - "icons/**"
+      - "scripts/package-cws.sh"
+      - "scripts/prepare-unpacked.sh"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build CWS zip
+        run: ./scripts/package-cws.sh
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cws-zip
+          path: build/*.zip

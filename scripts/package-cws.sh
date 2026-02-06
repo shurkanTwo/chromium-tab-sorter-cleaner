@@ -22,7 +22,7 @@ mkdir -p "$TMP_DIR" "$OUT_DIR"
 rm -rf "$TMP_DIR"/*
 cp -R "$ROOT_DIR/dist/." "$TMP_DIR/"
 
-ZIP_PATH="$OUT_DIR/tab-sorter-cleaner-v${VERSION}.zip"
+ZIP_PATH="$OUT_DIR/manage-tabs-auto-group-v${VERSION}.zip"
 rm -f "$ZIP_PATH"
 
 if command -v zip >/dev/null 2>&1; then
