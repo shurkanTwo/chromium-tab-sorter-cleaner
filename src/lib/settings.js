@@ -1,5 +1,6 @@
 import { CONFIG, SETTINGS_KEY, settings } from "./config.js";
 import { elements } from "./ui.js";
+import { SETTING_BINDINGS } from "./setting_definitions.js";
 
 function setCheckbox(element, value) {
   if (!element) return;
@@ -9,6 +10,13 @@ function setCheckbox(element, value) {
 function setInputValue(element, value) {
   if (!element) return;
   element.value = String(value);
+}
+
+function getBindingTarget(section) {
+  if (section === "settings") return settings;
+  if (section === "topicCluster") return CONFIG.topicCluster;
+  if (section === "topicThresholds") return CONFIG.topicThresholds;
+  return null;
 }
 
 export async function loadSettings() {
@@ -27,61 +35,17 @@ export async function loadSettings() {
       Object.assign(settings, stored);
     }
   }
-  setCheckbox(elements.nameGroupsToggle, settings.nameGroups);
-  if (elements.groupColorSelect) elements.groupColorSelect.value = settings.groupColor || "";
-  setCheckbox(elements.collapseAfterGroupToggle, settings.collapseAfterGroup);
-  setCheckbox(elements.includePinnedTabsToggle, settings.includePinnedTabs || false);
-  if (elements.lastVisitedOrderSelect) {
-    elements.lastVisitedOrderSelect.value = settings.lastVisitedOrder || "desc";
+  for (const binding of SETTING_BINDINGS) {
+    const target = getBindingTarget(binding.section);
+    if (!target) continue;
+    const element = elements[binding.elementKey];
+    if (!element) continue;
+    if (binding.type === "boolean") {
+      setCheckbox(element, target[binding.key]);
+      continue;
+    }
+    setInputValue(element, target[binding.key]);
   }
-  if (elements.topicSensitivitySelect) {
-    elements.topicSensitivitySelect.value = settings.topicSensitivity || "medium";
-  }
-  if (elements.activateTabsForContentToggle) {
-    elements.activateTabsForContentToggle.checked =
-      settings.activateTabsForContent || false;
-  }
-
-  setInputValue(elements.cfgKNearestInput, CONFIG.topicCluster.kNearest);
-  setInputValue(elements.cfgMinSharedTokensInput, CONFIG.topicCluster.minSharedTokens);
-  setInputValue(
-    elements.cfgMinAverageSimilarityFloorInput,
-    CONFIG.topicCluster.minAverageSimilarityFloor
-  );
-  setInputValue(
-    elements.cfgMinAverageSimilarityScaleInput,
-    CONFIG.topicCluster.minAverageSimilarityScale
-  );
-  setCheckbox(elements.cfgAdaptiveThresholdToggle, CONFIG.topicCluster.adaptiveThreshold);
-  setInputValue(
-    elements.cfgAdaptiveTargetSimilarityInput,
-    CONFIG.topicCluster.adaptiveTargetSimilarity
-  );
-  setInputValue(elements.cfgAdaptiveMinThresholdInput, CONFIG.topicCluster.adaptiveMinThreshold);
-  setInputValue(elements.cfgAdaptiveMaxThresholdInput, CONFIG.topicCluster.adaptiveMaxThreshold);
-  setInputValue(elements.cfgAdaptiveMaxPairsInput, CONFIG.topicCluster.adaptiveMaxPairs);
-  setCheckbox(elements.cfgUseBigramsToggle, CONFIG.topicCluster.useBigrams);
-  setInputValue(elements.cfgTitleKeywordLimitInput, CONFIG.topicCluster.titleKeywordLimit);
-  setCheckbox(elements.cfgTitleIncludeScoresToggle, CONFIG.topicCluster.titleIncludeScores);
-  setCheckbox(elements.cfgDebugLogGroupsToggle, CONFIG.topicCluster.debugLogGroups);
-  setInputValue(elements.cfgDebugKeywordLimitInput, CONFIG.topicCluster.debugKeywordLimit);
-  setInputValue(elements.cfgContentWeightInput, CONFIG.topicCluster.contentWeight);
-  setInputValue(elements.cfgContentTokenLimitInput, CONFIG.topicCluster.contentTokenLimit);
-  setInputValue(elements.cfgUrlTokenWeightInput, CONFIG.topicCluster.urlTokenWeight);
-  setCheckbox(
-    elements.cfgDynamicStopwordsEnabledToggle,
-    CONFIG.topicCluster.dynamicStopwordsEnabled
-  );
-  setInputValue(
-    elements.cfgDynamicStopwordsMinDocRatioInput,
-    CONFIG.topicCluster.dynamicStopwordsMinDocRatio
-  );
-  setInputValue(elements.cfgDynamicStopwordsMinDocsInput, CONFIG.topicCluster.dynamicStopwordsMinDocs);
-
-  setInputValue(elements.cfgThresholdHighInput, CONFIG.topicThresholds.high);
-  setInputValue(elements.cfgThresholdMediumInput, CONFIG.topicThresholds.medium);
-  setInputValue(elements.cfgThresholdLowInput, CONFIG.topicThresholds.low);
-  setInputValue(elements.cfgThresholdFallbackInput, CONFIG.topicThresholds.fallback);
 }
 
 export function saveSettings() {

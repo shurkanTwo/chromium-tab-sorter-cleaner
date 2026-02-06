@@ -1,6 +1,7 @@
 import { CONFIG, settings } from "../lib/config.js";
 import { elements, reportError, setStatus, setTopicGroupingRunning } from "../lib/ui.js";
 import { loadSettings, saveSettings } from "../lib/settings.js";
+import { SETTING_BINDINGS } from "../lib/setting_definitions.js";
 import {
   closeDuplicates,
   focusTargetWindow,
@@ -128,101 +129,32 @@ function bindNumberSetting(element, target, key, integer = false) {
   });
 }
 
-bindBooleanSetting(elements.nameGroupsToggle, settings, "nameGroups");
-bindSelectSetting(elements.groupColorSelect, settings, "groupColor");
-bindBooleanSetting(elements.collapseAfterGroupToggle, settings, "collapseAfterGroup");
-bindBooleanSetting(
-  elements.includePinnedTabsToggle,
-  settings,
-  "includePinnedTabs",
+function getBindingTarget(section) {
+  if (section === "settings") return settings;
+  if (section === "topicCluster") return CONFIG.topicCluster;
+  if (section === "topicThresholds") return CONFIG.topicThresholds;
+  return null;
+}
+
+const onChangeHandlers = {
   refresh
-);
-bindSelectSetting(elements.lastVisitedOrderSelect, settings, "lastVisitedOrder");
-bindSelectSetting(elements.topicSensitivitySelect, settings, "topicSensitivity");
-bindBooleanSetting(
-  elements.activateTabsForContentToggle,
-  settings,
-  "activateTabsForContent"
-);
+};
 
-bindNumberSetting(elements.cfgKNearestInput, CONFIG.topicCluster, "kNearest", true);
-bindNumberSetting(
-  elements.cfgMinSharedTokensInput,
-  CONFIG.topicCluster,
-  "minSharedTokens",
-  true
-);
-bindNumberSetting(
-  elements.cfgMinAverageSimilarityFloorInput,
-  CONFIG.topicCluster,
-  "minAverageSimilarityFloor"
-);
-bindNumberSetting(
-  elements.cfgMinAverageSimilarityScaleInput,
-  CONFIG.topicCluster,
-  "minAverageSimilarityScale"
-);
-bindBooleanSetting(elements.cfgAdaptiveThresholdToggle, CONFIG.topicCluster, "adaptiveThreshold");
-bindNumberSetting(
-  elements.cfgAdaptiveTargetSimilarityInput,
-  CONFIG.topicCluster,
-  "adaptiveTargetSimilarity"
-);
-bindNumberSetting(
-  elements.cfgAdaptiveMinThresholdInput,
-  CONFIG.topicCluster,
-  "adaptiveMinThreshold"
-);
-bindNumberSetting(
-  elements.cfgAdaptiveMaxThresholdInput,
-  CONFIG.topicCluster,
-  "adaptiveMaxThreshold"
-);
-bindNumberSetting(elements.cfgAdaptiveMaxPairsInput, CONFIG.topicCluster, "adaptiveMaxPairs", true);
-bindBooleanSetting(elements.cfgUseBigramsToggle, CONFIG.topicCluster, "useBigrams");
-bindNumberSetting(
-  elements.cfgTitleKeywordLimitInput,
-  CONFIG.topicCluster,
-  "titleKeywordLimit",
-  true
-);
-bindBooleanSetting(elements.cfgTitleIncludeScoresToggle, CONFIG.topicCluster, "titleIncludeScores");
-bindBooleanSetting(elements.cfgDebugLogGroupsToggle, CONFIG.topicCluster, "debugLogGroups");
-bindNumberSetting(
-  elements.cfgDebugKeywordLimitInput,
-  CONFIG.topicCluster,
-  "debugKeywordLimit",
-  true
-);
-bindNumberSetting(elements.cfgContentWeightInput, CONFIG.topicCluster, "contentWeight");
-bindNumberSetting(
-  elements.cfgContentTokenLimitInput,
-  CONFIG.topicCluster,
-  "contentTokenLimit",
-  true
-);
-bindNumberSetting(elements.cfgUrlTokenWeightInput, CONFIG.topicCluster, "urlTokenWeight");
-bindBooleanSetting(
-  elements.cfgDynamicStopwordsEnabledToggle,
-  CONFIG.topicCluster,
-  "dynamicStopwordsEnabled"
-);
-bindNumberSetting(
-  elements.cfgDynamicStopwordsMinDocRatioInput,
-  CONFIG.topicCluster,
-  "dynamicStopwordsMinDocRatio"
-);
-bindNumberSetting(
-  elements.cfgDynamicStopwordsMinDocsInput,
-  CONFIG.topicCluster,
-  "dynamicStopwordsMinDocs",
-  true
-);
-
-bindNumberSetting(elements.cfgThresholdHighInput, CONFIG.topicThresholds, "high");
-bindNumberSetting(elements.cfgThresholdMediumInput, CONFIG.topicThresholds, "medium");
-bindNumberSetting(elements.cfgThresholdLowInput, CONFIG.topicThresholds, "low");
-bindNumberSetting(elements.cfgThresholdFallbackInput, CONFIG.topicThresholds, "fallback");
+for (const binding of SETTING_BINDINGS) {
+  const element = elements[binding.elementKey];
+  const target = getBindingTarget(binding.section);
+  if (!element || !target) continue;
+  const onChange = binding.onChange ? onChangeHandlers[binding.onChange] : undefined;
+  if (binding.type === "boolean") {
+    bindBooleanSetting(element, target, binding.key, onChange);
+    continue;
+  }
+  if (binding.type === "select") {
+    bindSelectSetting(element, target, binding.key, onChange);
+    continue;
+  }
+  bindNumberSetting(element, target, binding.key, binding.integer === true);
+}
 
 window.addEventListener("error", (event) => {
   reportError("popup", event?.error || event?.message || "Unknown error");
