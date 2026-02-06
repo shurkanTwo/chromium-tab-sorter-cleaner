@@ -130,7 +130,14 @@
           </label>
           <label class="config-field config-check">
             <input type="checkbox" id="includePinnedTabs" />
-            <span>Include pinned tabs in actions</span>
+            <span>Include pinned tabs</span>
+          </label>
+          <label class="config-field">
+            <span>Last visited order</span>
+            <select id="lastVisitedOrder">
+              <option value="desc" selected>Newest first</option>
+              <option value="asc">Oldest first</option>
+            </select>
           </label>
           <label class="config-field">
             <span>Topic sensitivity</span>
@@ -144,113 +151,12 @@
             <input type="checkbox" id="activateTabsForContent" />
             <span>Activate tabs for content scan</span>
           </label>
-          <label class="config-field">
-            <span>Last visited order</span>
-            <select id="lastVisitedOrder">
-              <option value="desc" selected>Newest first</option>
-              <option value="asc">Oldest first</option>
-            </select>
-          </label>
-          <label class="config-field">
-            <span>kNearest</span>
-            <input id="cfgKNearest" type="number" min="1" step="1" />
-          </label>
-          <label class="config-field">
-            <span>Min shared tokens</span>
-            <input id="cfgMinSharedTokens" type="number" min="1" step="1" />
-          </label>
-          <label class="config-field">
-            <span>Min avg similarity floor</span>
-            <input id="cfgMinAverageSimilarityFloor" type="number" min="0" max="1" step="0.01" />
-          </label>
-          <label class="config-field">
-            <span>Min avg similarity scale</span>
-            <input id="cfgMinAverageSimilarityScale" type="number" min="0" max="2" step="0.01" />
-          </label>
-          <label class="config-field config-check">
-            <input id="cfgAdaptiveThreshold" type="checkbox" />
-            <span>Adaptive threshold</span>
-          </label>
-          <label class="config-field">
-            <span>Adaptive target similarity</span>
-            <input id="cfgAdaptiveTargetSimilarity" type="number" min="0" max="1" step="0.01" />
-          </label>
-          <label class="config-field">
-            <span>Adaptive min threshold</span>
-            <input id="cfgAdaptiveMinThreshold" type="number" min="0" max="1" step="0.01" />
-          </label>
-          <label class="config-field">
-            <span>Adaptive max threshold</span>
-            <input id="cfgAdaptiveMaxThreshold" type="number" min="0" max="1" step="0.01" />
-          </label>
-          <label class="config-field">
-            <span>Adaptive max pairs</span>
-            <input id="cfgAdaptiveMaxPairs" type="number" min="1" step="1" />
-          </label>
-          <label class="config-field config-check">
-            <input id="cfgUseBigrams" type="checkbox" />
-            <span>Use bigrams</span>
-          </label>
-          <label class="config-field">
-            <span>Title keyword limit</span>
-            <input id="cfgTitleKeywordLimit" type="number" min="1" step="1" />
-          </label>
-          <label class="config-field config-check">
-            <input id="cfgTitleIncludeScores" type="checkbox" />
-            <span>Title include scores</span>
-          </label>
-          <label class="config-field config-check">
-            <input id="cfgDebugLogGroups" type="checkbox" />
-            <span>Debug log groups</span>
-          </label>
-          <label class="config-field">
-            <span>Debug keyword limit</span>
-            <input id="cfgDebugKeywordLimit" type="number" min="1" step="1" />
-          </label>
-          <label class="config-field">
-            <span>Content weight</span>
-            <input id="cfgContentWeight" type="number" min="0" max="1" step="0.01" />
-          </label>
-          <label class="config-field">
-            <span>Content token limit</span>
-            <input id="cfgContentTokenLimit" type="number" min="1" step="1" />
-          </label>
-          <label class="config-field">
-            <span>URL token weight</span>
-            <input id="cfgUrlTokenWeight" type="number" min="0" max="1" step="0.01" />
-          </label>
-          <label class="config-field config-check">
-            <input id="cfgDynamicStopwordsEnabled" type="checkbox" />
-            <span>Dynamic stopwords</span>
-          </label>
-          <label class="config-field">
-            <span>Dynamic stopwords min doc ratio</span>
-            <input id="cfgDynamicStopwordsMinDocRatio" type="number" min="0" max="1" step="0.01" />
-          </label>
-          <label class="config-field">
-            <span>Dynamic stopwords min docs</span>
-            <input id="cfgDynamicStopwordsMinDocs" type="number" min="1" step="1" />
-          </label>
-          <label class="config-field">
-            <span>Threshold high</span>
-            <input id="cfgThresholdHigh" type="number" min="0" max="1" step="0.01" />
-          </label>
-          <label class="config-field">
-            <span>Threshold medium</span>
-            <input id="cfgThresholdMedium" type="number" min="0" max="1" step="0.01" />
-          </label>
-          <label class="config-field">
-            <span>Threshold low</span>
-            <input id="cfgThresholdLow" type="number" min="0" max="1" step="0.01" />
-          </label>
-          <label class="config-field">
-            <span>Threshold fallback</span>
-            <input id="cfgThresholdFallback" type="number" min="0" max="1" step="0.01" />
-          </label>
         </div>
-        <button id="resetSettings" class="config-reset" type="button">
-          Reset settings to defaults
-        </button>
+        <div class="config-actions">
+          <button id="resetSettings" class="config-reset" type="button">
+            Reset settings to defaults
+          </button>
+        </div>
       </details>
     </header>
 

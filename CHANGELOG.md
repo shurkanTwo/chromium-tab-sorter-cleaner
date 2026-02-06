@@ -20,6 +20,8 @@ All notable changes to this project will be documented in this file.
 - Optimized content scanning to activate tabs only when needed instead of warming every eligible tab.
 - Changed domain grouping names to use full hostnames.
 - Domain group names now strip a leading `www`/`wwwN` prefix.
+- Simplified configuration by removing technical tuning controls from the user-facing UI.
+- Persisted only user-facing settings and dropped hidden advanced-settings compatibility handling.
 
 ## [0.1.0] - 2026-02-05
 - Initial Chromium extension release.

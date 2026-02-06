@@ -252,7 +252,7 @@ button:disabled {
   border: 1px solid var(--border);
   border-radius: 14px;
   background: linear-gradient(180deg, rgba(24, 29, 48, 0.8), rgba(18, 22, 38, 0.85));
-  padding: 7px 9px;
+  padding: 9px 10px 10px;
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
 }
 
@@ -261,16 +261,14 @@ button:disabled {
   font-weight: 700;
   color: #e7eeff;
   font-size: 12px;
+  letter-spacing: 0.02em;
 }
 
 .config-grid {
   margin-top: 8px;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  max-height: 210px;
-  overflow-y: auto;
-  padding-right: 2px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px 10px;
 }
 
 .config-field {
@@ -281,6 +279,7 @@ button:disabled {
   font-size: 11px;
   color: var(--muted);
   font-weight: 600;
+  min-height: 30px;
 }
 
 .config-check {
@@ -289,10 +288,10 @@ button:disabled {
 
 .config-field input[type="number"],
 .config-field select {
-  width: 92px;
+  width: 96px;
   border: 1px solid rgba(170, 182, 221, 0.35);
   border-radius: 8px;
-  padding: 3px 6px;
+  padding: 4px 6px;
   font-size: 11px;
   font-weight: 600;
   color: var(--ink);
@@ -305,9 +304,13 @@ button:disabled {
 }
 
 .config-reset {
-  margin-top: 10px;
+  margin-top: 8px;
   width: 100%;
   min-height: 34px;
+}
+
+.config-actions {
+  display: flex;
 }
 
 .status-panel {
