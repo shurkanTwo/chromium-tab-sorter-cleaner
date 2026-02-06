@@ -1,3 +1,4 @@
 - when asked to commit changes. Commit the changes with a commit message that fits the changes.
 - only commmit the changes that were made in this agent thread
 - never do git revert without asking for approval first.
+- when changing any permissions in code or `manifest.json`, update all documentation and policies that mention permissions (README, `CWS_LISTING.md`, `PRIVACY.md`, `docs/index.html`, and `CWS_PUBLISHING_QA.md`).

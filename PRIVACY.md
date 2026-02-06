@@ -37,4 +37,4 @@ duplicates, group tabs by domain or topic, and review recent activity.
 
 ## Contact
 
-If you have questions, contact: Lucas Lepski (`lucas@lepski.de`)
+If you have questions, contact: Lucas Lepski (`dickymicky@gmx.de`)
