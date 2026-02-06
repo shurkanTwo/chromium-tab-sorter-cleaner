@@ -22,6 +22,19 @@ All notable changes to this project will be documented in this file.
 - Domain group names now strip a leading `www`/`wwwN` prefix.
 - Simplified configuration by removing technical tuning controls from the user-facing UI.
 - Persisted only user-facing settings and dropped hidden advanced-settings compatibility handling.
+- Improved top-toolbar hierarchy by separating primary actions from secondary group controls.
+- Added short helper text for key topic-grouping settings in configuration.
+- Removed the tab list/details section from the action window to reduce UI clutter.
+- Polished action-window styling (no all-caps labels, cleaner buttons, and compact fixed-size layout).
+- Replaced inline configuration with a top-right circular toggle that opens/closes a full overlay settings page.
+- Action window now enforces the standard size even when re-opening an existing action window.
+- Split action buttons into three sections: Sorting, Grouping, and Group controls.
+- Fixed config-toggle clickability while overlay is open by keeping the toggle button above the overlay layer.
+- Moved the config toggle to the root overlay layer so the close (X) button remains reliably clickable.
+- Redesigned the configuration overlay with clearer sections, improved spacing, and more readable controls.
+- Flattened configuration into one clear list with more explicit option labels and a smaller inline reset button.
+- Moved reset-to-defaults into a top pill button beside the config close control for quicker access.
+- Simplified action area visuals by removing section card containers and using regular-weight button text.
 
 ## [0.1.0] - 2026-02-05
 - Initial Chromium extension release.

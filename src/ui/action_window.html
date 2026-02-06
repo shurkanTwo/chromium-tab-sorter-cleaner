@@ -38,8 +38,9 @@
         </div>
       </div>
       <div class="action-zones">
-        <section class="action-zone">
-          <div class="actions actions-left">
+        <section class="action-zone action-zone-sorting">
+          <div class="action-zone-label">Sorting</div>
+          <div class="actions actions-sorting">
             <button id="closeDuplicates">
               <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M7 3h10a2 2 0 0 1 2 2v10h-2V5H7V3z" />
@@ -61,8 +62,9 @@
             </button>
           </div>
         </section>
-        <section class="action-zone">
-          <div class="actions actions-right">
+        <section class="action-zone action-zone-grouping">
+          <div class="action-zone-label">Grouping</div>
+          <div class="actions actions-grouping">
             <button id="groupDomain">
               <svg class="btn-icon btn-icon-stroke" viewBox="0 0 24 24" aria-hidden="true">
                 <circle cx="12" cy="12" r="9" />
@@ -79,6 +81,11 @@
               </svg>
               <span>Group by topic</span>
             </button>
+          </div>
+        </section>
+        <section class="action-zone action-zone-secondary">
+          <div class="action-zone-label">Group controls</div>
+          <div class="actions actions-secondary">
             <button id="collapseGroups">
               <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M4 4h16a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm0 9h16a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2z" />
@@ -102,79 +109,100 @@
           </div>
         </section>
       </div>
-      <details class="config-panel">
-        <summary>Configuration</summary>
-        <div class="config-grid">
-          <label class="config-field config-check">
-            <input type="checkbox" id="nameGroups" checked />
-            <span>Name groups</span>
-          </label>
-          <label class="config-field">
-            <span>Group color</span>
-            <select id="groupColor">
-              <option value="" selected>No color</option>
-              <option value="blue">Blue</option>
-              <option value="red">Red</option>
-              <option value="yellow">Yellow</option>
-              <option value="green">Green</option>
-              <option value="pink">Pink</option>
-              <option value="purple">Purple</option>
-              <option value="cyan">Cyan</option>
-              <option value="orange">Orange</option>
-              <option value="grey">Grey</option>
-            </select>
-          </label>
-          <label class="config-field config-check">
-            <input type="checkbox" id="collapseAfterGroup" />
-            <span>Collapse after grouping</span>
-          </label>
-          <label class="config-field config-check">
-            <input type="checkbox" id="includePinnedTabs" />
-            <span>Include pinned tabs</span>
-          </label>
-          <label class="config-field">
-            <span>Last visited order</span>
-            <select id="lastVisitedOrder">
-              <option value="desc" selected>Newest first</option>
-              <option value="asc">Oldest first</option>
-            </select>
-          </label>
-          <label class="config-field">
-            <span>Topic sensitivity</span>
-            <select id="topicSensitivity">
-              <option value="low">Low</option>
-              <option value="medium" selected>Medium</option>
-              <option value="high">High</option>
-            </select>
-          </label>
-          <label class="config-field config-check">
-            <input type="checkbox" id="activateTabsForContent" />
-            <span>Activate tabs for content scan</span>
-          </label>
-        </div>
-        <div class="config-actions">
-          <button id="resetSettings" class="config-reset" type="button">
-            Reset settings to defaults
-          </button>
-        </div>
-      </details>
     </header>
 
-    <main class="content">
-      <section class="list">
-        <div class="list-header">
-          <span>Tabs in this window</span>
-          <span id="tabCount">0</span>
+    <button
+      id="configToggle"
+      class="config-toggle-btn"
+      type="button"
+      title="Configuration"
+      aria-label="Configuration"
+      aria-expanded="false"
+    >
+      <svg class="btn-icon icon-gear" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M19.43 12.98a7.98 7.98 0 0 0 .05-.98 7.98 7.98 0 0 0-.05-.98l2.11-1.65a.5.5 0 0 0 .12-.64l-2-3.46a.5.5 0 0 0-.6-.22l-2.49 1a7.9 7.9 0 0 0-1.7-.98l-.38-2.65a.5.5 0 0 0-.49-.42h-4a.5.5 0 0 0-.49.42l-.38 2.65c-.61.24-1.18.57-1.7.98l-2.49-1a.5.5 0 0 0-.6.22l-2 3.46a.5.5 0 0 0 .12.64l2.11 1.65a7.98 7.98 0 0 0-.05.98c0 .33.02.66.05.98l-2.11 1.65a.5.5 0 0 0-.12.64l2 3.46a.5.5 0 0 0 .6.22l2.49-1c.52.41 1.09.74 1.7.98l.38 2.65a.5.5 0 0 0 .49.42h4a.5.5 0 0 0 .49-.42l.38-2.65c.61-.24 1.18-.57 1.7-.98l2.49 1a.5.5 0 0 0 .6-.22l2-3.46a.5.5 0 0 0-.12-.64l-2.11-1.65zM12 15.5A3.5 3.5 0 1 1 12 8a3.5 3.5 0 0 1 0 7.5z" />
+      </svg>
+      <svg class="btn-icon icon-close" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M6 6l12 12M18 6L6 18" class="btn-icon-stroke" />
+      </svg>
+    </button>
+    <button id="resetSettings" class="config-reset config-reset-top" type="button">
+      Reset to defaults
+    </button>
+
+    <section id="configOverlay" class="config-overlay" hidden>
+      <div class="config-overlay-card">
+        <div class="config-overlay-header">
+          <div class="config-overlay-title">Configuration</div>
+          <p class="config-overlay-subtitle">Adjust grouping and sorting behavior for this window.</p>
         </div>
-        <ul id="tabs"></ul>
-      </section>
-      <aside class="details">
-        <div class="details-title">Tab details</div>
-        <div id="detailsBody" class="details-body">
-          Hover a tab to see last visited and time spent.
+        <div class="config-list">
+          <div class="config-stack">
+            <label class="config-field config-check">
+              <input type="checkbox" id="nameGroups" checked />
+              <span>Name created tab groups (domain/topic)</span>
+            </label>
+          </div>
+          <div class="config-stack">
+            <label class="config-field config-check">
+              <input type="checkbox" id="collapseAfterGroup" />
+              <span>Collapse groups immediately after creating them</span>
+            </label>
+          </div>
+          <div class="config-stack">
+            <label class="config-field">
+              <span>Color for newly created groups</span>
+              <select id="groupColor">
+                <option value="" selected>Auto (browser chooses)</option>
+                <option value="blue">Blue</option>
+                <option value="red">Red</option>
+                <option value="yellow">Yellow</option>
+                <option value="green">Green</option>
+                <option value="pink">Pink</option>
+                <option value="purple">Purple</option>
+                <option value="cyan">Cyan</option>
+                <option value="orange">Orange</option>
+                <option value="grey">Grey</option>
+              </select>
+            </label>
+          </div>
+          <div class="config-stack">
+            <label class="config-field config-check">
+              <input type="checkbox" id="includePinnedTabs" />
+              <span>Include pinned tabs in actions</span>
+            </label>
+          </div>
+          <div class="config-stack">
+            <label class="config-field">
+              <span>Sort by last visited: tab order</span>
+              <select id="lastVisitedOrder">
+                <option value="desc" selected>Newest first</option>
+                <option value="asc">Oldest first</option>
+              </select>
+            </label>
+          </div>
+          <div class="config-stack">
+            <label class="config-field">
+              <span>Group by topic: sensitivity</span>
+              <select id="topicSensitivity">
+                <option value="low">Low</option>
+                <option value="medium" selected>Medium</option>
+                <option value="high">High</option>
+              </select>
+            </label>
+            <p class="config-help">Low groups more broadly, High groups more strictly.</p>
+          </div>
+          <div class="config-stack">
+            <label class="config-field config-check">
+              <input type="checkbox" id="activateTabsForContent" />
+              <span>Group by topic: activate tabs for content scan</span>
+            </label>
+            <p class="config-help">Improves grouping quality, but can momentarily switch visible tabs while scanning.</p>
+          </div>
         </div>
-      </aside>
-    </main>
+      </div>
+    </section>
+
     <section class="status-panel" aria-live="polite">
       <div class="status-line">
         <div id="statusMessage" class="status-text" role="status"></div>

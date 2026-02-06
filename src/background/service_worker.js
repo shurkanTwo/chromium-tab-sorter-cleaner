@@ -114,6 +114,8 @@ chrome.runtime.onSuspend.addListener(() => {
 
 async function openActionWindow(sourceTab) {
   const targetWindowId = sourceTab?.windowId ?? null;
+  const width = 760;
+  const height = 520;
   const actionWindowPrefix = chrome.runtime.getURL("src/ui/action_window.html");
   const url = chrome.runtime.getURL(
     targetWindowId != null
@@ -125,12 +127,10 @@ async function openActionWindow(sourceTab) {
     if (existingTab.url !== url) {
       await chrome.tabs.update(existingTab.id, { url });
     }
-    await chrome.windows.update(existingTab.windowId, { focused: true });
+    await chrome.windows.update(existingTab.windowId, { focused: true, width, height });
     await chrome.tabs.update(existingTab.id, { active: true });
     return;
   }
-  const width = 840;
-  const height = 720;
   const lastFocused = await chrome.windows.getLastFocused();
   const left =
     Number.isFinite(lastFocused.left) && Number.isFinite(lastFocused.width)

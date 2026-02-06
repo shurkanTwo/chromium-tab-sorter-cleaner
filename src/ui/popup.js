@@ -23,6 +23,19 @@ import {
   requestStopTopicGrouping
 } from "../lib/topic.js";
 
+const configOverlay = document.getElementById("configOverlay");
+const configToggleButton = document.getElementById("configToggle");
+
+function setConfigOverlayOpen(open) {
+  if (!configOverlay || !configToggleButton) return;
+  const nextOpen = Boolean(open);
+  configOverlay.hidden = !nextOpen;
+  document.body.classList.toggle("config-open", nextOpen);
+  configToggleButton.setAttribute("aria-expanded", nextOpen ? "true" : "false");
+  configToggleButton.setAttribute("aria-label", nextOpen ? "Close configuration" : "Open configuration");
+  configToggleButton.title = nextOpen ? "Close configuration" : "Configuration";
+}
+
 async function runTopicGroupingWithStop() {
   setTopicGroupingRunning(true);
   try {
@@ -94,6 +107,13 @@ if (elements.resetSettingsButton) {
     await resetSettingsToDefaults();
     await refresh();
     setStatus("Settings reset to defaults.");
+  });
+}
+
+if (configToggleButton && configOverlay) {
+  configToggleButton.addEventListener("click", () => {
+    const isOpen = document.body.classList.contains("config-open");
+    setConfigOverlayOpen(!isOpen);
   });
 }
 
@@ -173,10 +193,17 @@ window.addEventListener("unhandledrejection", (event) => {
   reportError("popup", event?.reason || "Unhandled rejection");
 });
 
+window.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape") return;
+  if (!document.body.classList.contains("config-open")) return;
+  setConfigOverlayOpen(false);
+});
+
 Promise.all([loadSettings(), loadUndoStack()])
   .then(async () => {
     setTopicGroupingRunning(hasActiveTopicGrouping());
     await refresh();
     await updateTargetWindowLabel();
+    setConfigOverlayOpen(false);
   })
   .catch((error) => reportError("startup", error));
